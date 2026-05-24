@@ -1,0 +1,2 @@
+"""Obesity probability ML application."""
+
