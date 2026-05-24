@@ -46,3 +46,15 @@ Then open:
 http://127.0.0.1:8000
 ```
 # Machine-Learning-within-Application-for-analysis-a-probability-of-Obesity-in-Thai-People
+
+## Current ML Protocol
+
+The training pipeline now uses a safer research prototype workflow:
+
+- Model selection is based on stratified cross-validation on the training split.
+- The final test split is kept separate for reporting only.
+- Class imbalance is handled with SMOTENC before preprocessing, so categorical survey answers are not turned into unrealistic fractional one-hot values.
+- Calibration is only performed when there is enough training data for a separate calibration split; the final test set is not used for calibration.
+- The UI describes the selected model as the best model for the current training data, not as a universal medical truth.
+
+The included sample CSV is intentionally tiny and exists only to prove the app and algorithms run. Real conclusions should wait for the completed experimental dataset.

@@ -17,7 +17,7 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -33,10 +33,10 @@ from obesity_ml.config import (
 from obesity_ml.features import add_engineered_features, validate_training_frame
 
 try:
-    from imblearn.over_sampling import SMOTE
+    from imblearn.over_sampling import SMOTENC
     from imblearn.pipeline import Pipeline as ImbPipeline
 except ImportError:  # pragma: no cover - optional dependency fallback
-    SMOTE = None
+    SMOTENC = None
     ImbPipeline = None
 
 XGBOOST_IMPORT_ERROR = None
@@ -64,16 +64,26 @@ def build_preprocessor() -> ColumnTransformer:
 
 
 def can_use_smote(y_train: pd.Series) -> bool:
-    return SMOTE is not None and y_train.nunique() == 2 and y_train.value_counts().min() >= 3
+    return SMOTENC is not None and y_train.nunique() == 2 and y_train.value_counts().min() >= 3
 
 
 def make_pipeline(model, y_train: pd.Series) -> Pipeline:
-    steps = [("preprocess", build_preprocessor())]
+    steps = []
     if can_use_smote(y_train):
         minority_count = int(y_train.value_counts().min())
-        steps.append(("smote", SMOTE(k_neighbors=max(1, min(5, minority_count - 1)), random_state=42)))
+        steps.append(
+            (
+                "smotenc",
+                SMOTENC(
+                    categorical_features=CATEGORICAL_FEATURES,
+                    k_neighbors=max(1, min(5, minority_count - 2)),
+                    random_state=42,
+                ),
+            )
+        )
+    steps.append(("preprocess", build_preprocessor()))
     steps.append(("model", model))
-    if len(steps) > 2 and ImbPipeline is not None:
+    if any(step_name == "smotenc" for step_name, _ in steps) and ImbPipeline is not None:
         return ImbPipeline(steps=steps)
     return Pipeline(steps=steps)
 
@@ -127,19 +137,23 @@ def candidate_models(y_train: pd.Series) -> dict[str, Pipeline]:
     return candidates
 
 
-def evaluate_model(model: Pipeline, x_test: pd.DataFrame, y_test: pd.Series) -> dict[str, float]:
-    probability = model.predict_proba(x_test)[:, 1]
+def evaluate_probabilities(y_true: pd.Series, probability) -> dict[str, float]:
     prediction = (probability >= 0.5).astype(int)
     metrics = {
-        "accuracy": accuracy_score(y_test, prediction),
-        "balanced_accuracy": balanced_accuracy_score(y_test, prediction),
-        "precision": precision_score(y_test, prediction, zero_division=0),
-        "recall": recall_score(y_test, prediction, zero_division=0),
-        "f1": f1_score(y_test, prediction, zero_division=0),
-        "brier_score": brier_score_loss(y_test, probability),
+        "accuracy": accuracy_score(y_true, prediction),
+        "balanced_accuracy": balanced_accuracy_score(y_true, prediction),
+        "precision": precision_score(y_true, prediction, zero_division=0),
+        "recall": recall_score(y_true, prediction, zero_division=0),
+        "f1": f1_score(y_true, prediction, zero_division=0),
+        "brier_score": brier_score_loss(y_true, probability),
     }
-    metrics["roc_auc"] = roc_auc_score(y_test, probability) if len(set(y_test)) > 1 else float("nan")
+    metrics["roc_auc"] = roc_auc_score(y_true, probability) if len(set(y_true)) > 1 else float("nan")
     return metrics
+
+
+def evaluate_model(model: Pipeline, x_test: pd.DataFrame, y_test: pd.Series) -> dict[str, float]:
+    probability = model.predict_proba(x_test)[:, 1]
+    return evaluate_probabilities(y_test, probability)
 
 
 def score_for_selection(metrics: dict[str, float]) -> tuple[float, float, float]:
@@ -147,6 +161,46 @@ def score_for_selection(metrics: dict[str, float]) -> tuple[float, float, float]
     if roc_auc != roc_auc:  # NaN check
         roc_auc = 0.0
     return (roc_auc, metrics["f1"], -metrics["brier_score"])
+
+
+def cross_validation_strategy(y_train: pd.Series) -> StratifiedKFold | None:
+    if y_train.nunique() != 2:
+        return None
+    minority_count = int(y_train.value_counts().min())
+    if minority_count < 2:
+        return None
+    return StratifiedKFold(n_splits=min(5, minority_count), shuffle=True, random_state=42)
+
+
+def cross_validated_metrics(model: Pipeline, x_train: pd.DataFrame, y_train: pd.Series) -> dict[str, float]:
+    cv = cross_validation_strategy(y_train)
+    if cv is None:
+        model.fit(x_train, y_train)
+        return evaluate_model(model, x_train, y_train)
+    probability = cross_val_predict(model, x_train, y_train, cv=cv, method="predict_proba")[:, 1]
+    return evaluate_probabilities(y_train, probability)
+
+
+def split_training_and_calibration(x_train: pd.DataFrame, y_train: pd.Series):
+    can_calibrate = y_train.nunique() == 2 and y_train.value_counts().min() >= 3 and len(y_train) >= 12
+    if not can_calibrate:
+        return x_train, None, y_train, None
+    return train_test_split(
+        x_train,
+        y_train,
+        test_size=0.2,
+        random_state=42,
+        stratify=y_train,
+    )
+
+
+def dataset_warning(sample_count: int) -> str:
+    if sample_count < 50:
+        return (
+            "Prototype warning: this training file is very small. Metrics are useful for checking the "
+            "pipeline, but not for research claims until the real dataset is collected."
+        )
+    return ""
 
 
 def train(data_path: Path, model_path: Path = MODEL_PATH) -> dict[str, object]:
@@ -166,33 +220,36 @@ def train(data_path: Path, model_path: Path = MODEL_PATH) -> dict[str, object]:
         stratify=stratify,
     )
 
-    results = {}
+    validation_results = {}
     trained_models = {}
     for name, model in candidate_models(y_train).items():
-        model.fit(x_train, y_train)
-        results[name] = evaluate_model(model, x_test, y_test)
+        validation_results[name] = cross_validated_metrics(model, x_train, y_train)
+        x_fit, x_calibration, y_fit, y_calibration = split_training_and_calibration(x_train, y_train)
+        model.fit(x_fit, y_fit)
+        if x_calibration is not None and y_calibration is not None:
+            model = CalibratedClassifierCV(FrozenEstimator(model), method="sigmoid")
+            model.fit(x_calibration, y_calibration)
         trained_models[name] = model
 
-    best_name = max(results, key=lambda name: score_for_selection(results[name]))
+    best_name = max(validation_results, key=lambda name: score_for_selection(validation_results[name]))
     best_model = trained_models[best_name]
-
-    if y_test.nunique() == 2 and len(y_test) >= 4:
-        calibrated_model = CalibratedClassifierCV(FrozenEstimator(best_model), method="sigmoid")
-        calibrated_model.fit(x_test, y_test)
-    else:
-        calibrated_model = best_model
+    test_results = {name: evaluate_model(model, x_test, y_test) for name, model in trained_models.items()}
 
     artifact = {
-        "model": calibrated_model,
+        "model": best_model,
         "base_model_name": best_name,
-        "metrics": results,
+        "metrics": validation_results,
+        "test_metrics": test_results,
         "feature_columns": list(x.columns),
         "target_column": TARGET_COLUMN,
         "used_smote": can_use_smote(y_train),
-        "candidate_methods": list(results.keys()),
+        "candidate_methods": list(validation_results.keys()),
         "xgboost_status": "enabled" if XGBClassifier is not None else f"disabled: {XGBOOST_IMPORT_ERROR}",
         "reference_notes": REFERENCE_NOTES,
-        "selection_rule": "Choose highest ROC-AUC, then F1, then lowest Brier score.",
+        "selection_rule": "Choose highest cross-validated ROC-AUC, then F1, then lowest Brier score.",
+        "validation_strategy": "Stratified cross-validation on the training split; final test split is kept for reporting only.",
+        "resampling_strategy": "SMOTENC before preprocessing for categorical-safe balancing." if can_use_smote(y_train) else "Class weights/fallback only; SMOTENC skipped because data is too small or unavailable.",
+        "dataset_warning": dataset_warning(len(df)),
         "disclaimer": "Educational risk-estimation model only; not a medical diagnosis.",
     }
 
@@ -210,10 +267,17 @@ def main() -> None:
     artifact = train(args.data, args.model)
     print(f"Saved model to: {args.model}")
     print(f"Best base model: {artifact['base_model_name']}")
-    print(f"SMOTE used: {artifact['used_smote']}")
+    print(f"SMOTENC used: {artifact['used_smote']}")
     print(f"Selection rule: {artifact['selection_rule']}")
-    print("Metrics:")
+    print(f"Validation strategy: {artifact['validation_strategy']}")
+    print(f"Resampling strategy: {artifact['resampling_strategy']}")
+    if artifact["dataset_warning"]:
+        print(artifact["dataset_warning"])
+    print("Cross-validation metrics used for selection:")
     for name, metrics in artifact["metrics"].items():
+        print(f"  {name}: {metrics}")
+    print("Final hold-out test metrics for reporting only:")
+    for name, metrics in artifact["test_metrics"].items():
         print(f"  {name}: {metrics}")
 
 

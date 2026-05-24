@@ -39,6 +39,10 @@ def predict_probability(input_data: dict, model_path: Path = MODEL_PATH) -> dict
         "candidate_methods": artifact.get("candidate_methods", []),
         "used_smote": bool(artifact.get("used_smote", False)),
         "selection_rule": artifact.get("selection_rule", ""),
+        "validation_strategy": artifact.get("validation_strategy", ""),
+        "resampling_strategy": artifact.get("resampling_strategy", ""),
+        "dataset_warning": artifact.get("dataset_warning", ""),
         "metrics": artifact.get("metrics", {}),
+        "test_metrics": artifact.get("test_metrics", {}),
         "disclaimer": artifact["disclaimer"],
     }

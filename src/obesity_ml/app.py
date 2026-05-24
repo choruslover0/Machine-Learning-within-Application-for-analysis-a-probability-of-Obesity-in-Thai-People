@@ -15,7 +15,7 @@ PRODUCERS = [
 ]
 
 METHODS = [
-    ("SMOTE", "Balances minority/majority classes when enough real samples exist."),
+    ("SMOTENC", "Balances minority/majority classes while respecting categorical survey answers."),
     ("Logistic Regression", "Baseline medical-risk model; easy to explain."),
     ("Support Vector Machine", "Finds a strong boundary between risk groups."),
     ("Random Forest", "Many decision trees vote together; robust for survey data."),
@@ -756,14 +756,14 @@ def best_model_reason(result: dict) -> str:
     best_metrics = metrics[best_name]
     runner_name = ranked[1][0] if len(ranked) > 1 else None
     brier = best_metrics.get("brier_score")
-    brier_text = f" and the lowest Brier score ({brier:.4f}), meaning its probabilities were better calibrated" if isinstance(brier, (int, float)) else ""
+    brier_text = f" and the lowest Brier score ({brier:.4f}), meaning its probability estimates had lower error on validation data" if isinstance(brier, (int, float)) else ""
     if runner_name:
         return (
-            f"{best_name} is selected because the tournament sorts models by ROC-AUC first, F1 score second, "
-            f"and Brier score third. It stayed at the top of that rule{brier_text}. "
-            f"The nearest comparison model in this run is {runner_name}."
+            f"{best_name} is selected for the current training data because the tournament sorts models by "
+            f"cross-validated ROC-AUC first, F1 score second, and Brier score third. "
+            f"It stayed at the top of that rule{brier_text}. The nearest comparison model in this run is {runner_name}."
         )
-    return f"{best_name} is selected because it is the strongest model under the current tournament rule."
+    return f"{best_name} is selected for the current training data under the current tournament rule."
 
 
 def metric_bars_html(metrics: dict) -> str:
@@ -841,11 +841,17 @@ def methods() -> str:
         used_smote = "Yes" if artifact.get("used_smote") else "No or not enough minority samples"
         selection = artifact.get("selection_rule", "Train first to see selection rule.")
         xgboost_status = artifact.get("xgboost_status", "unknown")
+        validation_strategy = artifact.get("validation_strategy", "Not recorded yet")
+        resampling_strategy = artifact.get("resampling_strategy", "Not recorded yet")
+        dataset_warning = artifact.get("dataset_warning", "")
     except FileNotFoundError:
         best = "not trained yet"
         used_smote = "not trained yet"
         selection = "Train the model first."
         xgboost_status = "not trained yet"
+        validation_strategy = "not trained yet"
+        resampling_strategy = "not trained yet"
+        dataset_warning = ""
 
     body = f"""
     <section class="card">
@@ -854,15 +860,18 @@ def methods() -> str:
       <p class="lead">
         The pipeline follows the direction of your Notion references: compare logistic regression with
         modern machine-learning models, balance data when classes are uneven, and keep the winning
-        method visible for research transparency.
+        method visible for research transparency. Model selection now uses cross-validation on the training split.
       </p>
       {methods_html()}
     </section>
     <section class="section-grid">
       <div class="card"><h2>Current best model</h2><p>{best}</p></div>
-      <div class="card"><h2>SMOTE used?</h2><p>{used_smote}</p></div>
+      <div class="card"><h2>SMOTENC used?</h2><p>{used_smote}</p></div>
       <div class="card"><h2>Selection rule</h2><p>{selection}</p></div>
       <div class="card"><h2>XGBoost status</h2><p>{xgboost_status}</p></div>
+      <div class="card"><h2>Validation strategy</h2><p>{validation_strategy}</p></div>
+      <div class="card"><h2>Balancing strategy</h2><p>{resampling_strategy}</p></div>
+      <div class="card"><h2>Dataset note</h2><p>{dataset_warning or "Ready for real dataset."}</p></div>
     </section>
     """
     return page_shell("Methods - SK Obesity ML", body)
@@ -942,6 +951,7 @@ def predict_form(
     percent = round(result["obesity_probability"] * 100, 1)
     reason = best_model_reason(result)
     metric_bars = metric_bars_html(result.get("metrics", {}))
+    dataset_warning_html = f"<p>{result['dataset_warning']}</p>" if result.get("dataset_warning") else ""
     body = f"""
     <section class="card result-card">
       <div class="pill">Prediction result</div>
@@ -952,12 +962,14 @@ def predict_form(
         <h2>Why this algorithm is best</h2>
         <p>Winning model: <strong>{result["base_model_name"]}</strong></p>
         <p>{reason}</p>
-        <p>SMOTE used during training: <strong>{"Yes" if result["used_smote"] else "No"}</strong></p>
+        <p>SMOTENC used during training: <strong>{"Yes" if result["used_smote"] else "No"}</strong></p>
       </div>
       <div class="reason-box" style="margin-top:14px">
         <h2>Model tournament scores</h2>
+        <p>These bars use cross-validation on the current training data. They are not universal medical accuracy claims.</p>
         {metric_bars}
       </div>
+      {dataset_warning_html}
       <p>{result["disclaimer"]}</p>
       <div class="actions" style="justify-content:center">
         <a class="button" href="/predictor">Try another input</a>
