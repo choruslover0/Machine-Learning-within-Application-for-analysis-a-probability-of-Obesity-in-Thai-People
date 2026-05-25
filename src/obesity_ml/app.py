@@ -129,10 +129,14 @@ STYLE = """
     grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
     gap: 18px;
     padding: 22px;
-    align-items: center;
+    align-items: start;
   }
 
-  .hero-copy { padding: 14px; }
+  .hero-copy {
+    padding: 14px;
+    align-self: start;
+    margin-top: 28px;
+  }
 
   .kicker {
     width: fit-content;
@@ -259,7 +263,7 @@ STYLE = """
   .story {
     display: grid;
     grid-template-columns: 42px 1fr;
-    gap: 10px;
+    gap: 14px;
     align-items: center;
     border-radius: 18px;
     padding: 10px;
@@ -269,6 +273,23 @@ STYLE = """
   }
 
   .story:hover { transform: translateX(4px); background: rgba(255,255,255,.14); }
+
+  .story > div:last-child {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .story strong {
+    flex: 0 0 auto;
+  }
+
+  .story span {
+    color: rgba(255,255,255,.78);
+    line-height: 1.35;
+  }
 
   .story-icon {
     width: 42px;
