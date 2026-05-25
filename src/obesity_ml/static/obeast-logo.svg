@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420" role="img" aria-labelledby="title desc">
+  <title id="title">O-Beast Logo</title>
+  <desc id="desc">Aggressive fat beast mascot logo for the O-Beast obesity probability app.</desc>
+  <defs>
+    <linearGradient id="fire" x1="74" y1="48" x2="330" y2="352" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fcaf45"/>
+      <stop offset=".42" stop-color="#e1306c"/>
+      <stop offset="1" stop-color="#833ab4"/>
+    </linearGradient>
+    <linearGradient id="dark" x1="108" y1="86" x2="300" y2="326" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2b163a"/>
+      <stop offset="1" stop-color="#111116"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#111116" flood-opacity=".32"/>
+    </filter>
+  </defs>
+  <rect width="420" height="420" rx="86" fill="#111116"/>
+  <circle cx="116" cy="92" r="76" fill="#fcaf45" opacity=".20"/>
+  <circle cx="318" cy="132" r="92" fill="#e1306c" opacity=".18"/>
+  <g filter="url(#shadow)">
+    <path d="M95 231c-19-17-34-39-40-67 19 2 37 12 49 29 4-37 28-70 62-84l-21-54c31 9 54 27 68 55 21-24 48-37 81-38l-22 58c35 26 55 66 55 111 0 74-53 123-128 123-47 0-82-14-104-41-23 7-46 3-68-14 18-13 36-28 68-78Z" fill="url(#fire)"/>
+    <path d="M124 241c0-68 36-122 88-122 55 0 93 52 93 123 0 58-34 96-90 96-57 0-91-38-91-97Z" fill="url(#dark)"/>
+    <path d="M138 226c12-28 37-44 73-44 38 0 65 16 80 44-23-10-48-13-76-13-29 0-54 4-77 13Z" fill="#fff" opacity=".08"/>
+    <path d="M160 235c22 17 48 25 79 25 17 0 34-3 50-10-9 35-35 55-73 55-34 0-57-23-56-70Z" fill="#f7f7fb"/>
+    <path d="M182 250l16 30 17-31 18 31 17-32 14 25c-14 19-31 29-52 29-22 0-38-18-30-52Z" fill="#111116"/>
+    <path d="M145 177c22 3 39 13 51 29-26 0-45-6-57-19-5-5 0-11 6-10Z" fill="#fcaf45"/>
+    <path d="M282 177c-22 3-39 13-51 29 26 0 45-6 57-19 5-5 0-11-6-10Z" fill="#fcaf45"/>
+    <circle cx="181" cy="208" r="9" fill="#111116"/>
+    <circle cx="247" cy="208" r="9" fill="#111116"/>
+    <path d="M111 258c-29 10-49 8-61-6 19-15 42-24 69-25l-8 31Z" fill="#e1306c"/>
+    <path d="M309 258c29 10 49 8 61-6-19-15-42-24-69-25l8 31Z" fill="#e1306c"/>
+  </g>
+  <text x="210" y="389" text-anchor="middle" font-family="Arial Black, Impact, system-ui, sans-serif" font-size="54" font-weight="900" fill="#fff" letter-spacing="0">O-Beast</text>
+</svg>

@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from obesity_ml.predict import load_artifact, predict_probability
 
 
 app = FastAPI(title="Obesity Probability ML App")
+app.mount("/static", StaticFiles(directory="src/obesity_ml/static"), name="static")
 
 
 PRODUCERS = [
@@ -75,7 +77,19 @@ STYLE = """
     backdrop-filter: blur(18px);
   }
 
-  .brand { font-weight: 1000; }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 1000;
+  }
+
+  .brand-logo {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(225, 48, 108, 0.22);
+  }
 
   .nav-links {
     display: flex;
@@ -214,6 +228,15 @@ STYLE = """
     color: var(--ink);
     font-size: 36px;
     font-weight: 1000;
+  }
+
+  .beast-mark {
+    width: min(190px, 68vw);
+    aspect-ratio: 1;
+    display: block;
+    margin: 8px auto 16px;
+    border-radius: 34px;
+    box-shadow: 0 22px 52px rgba(225, 48, 108, 0.28);
   }
 
   .mini-stat {
@@ -638,7 +661,7 @@ def page_shell(title: str, body: str) -> str:
     <body>
       <main>
         <nav class="nav">
-          <div class="brand">sk_research.ml</div>
+          <div class="brand"><img class="brand-logo" src="/static/obeast-logo.svg" alt="O-Beast logo">O-Beast</div>
           <div class="nav-links">
             <a href="/">Home</a>
             <a href="/predictor">Predictor</a>
@@ -787,7 +810,7 @@ def home() -> str:
     <section class="hero">
       <div class="hero-copy">
         <div class="kicker">The SK Research Project</div>
-        <h1>Obesity Probability ML</h1>
+        <h1>O-Beast</h1>
         <p class="lead">
           Welcome to our obesity probability research app. Explore the predictor, learn how the model works,
           and see how machine learning can support a student research project in a clear and interactive way.
@@ -799,7 +822,7 @@ def home() -> str:
       </div>
       <div class="phone-preview">
         <div class="pill">Prototype model</div>
-        <div class="avatar"><div class="avatar-inner">SK</div></div>
+        <img class="beast-mark" src="/static/obeast-logo.svg" alt="O-Beast aggressive beast mascot logo">
         <h2 style="text-align:center">Risk feed</h2>
         <div class="mini-stat">
           <div><strong>10</strong><span>inputs</span></div>
@@ -883,7 +906,7 @@ def predictor() -> str:
     <section class="predict-layout">
       <aside class="card profile">
         <div class="pill">Prediction screen</div>
-        <div class="avatar"><div class="avatar-inner">SK</div></div>
+        <img class="beast-mark" src="/static/obeast-logo.svg" alt="O-Beast aggressive beast mascot logo">
         <h2 style="text-align:center">New risk check</h2>
         <p class="note" style="text-align:center">
           Fill the profile. The trained model calculates BMI and combines lifestyle clues into a probability.
