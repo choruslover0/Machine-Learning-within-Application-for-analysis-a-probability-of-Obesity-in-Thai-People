@@ -1,8 +1,11 @@
+from html import escape
+
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from obesity_ml.advice import generate_advice
 from obesity_ml.predict import load_artifact, predict_probability
 
 
@@ -204,6 +207,24 @@ STYLE = """
     border: 1px solid var(--line);
   }
 
+  .action-form {
+    display: inline;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    animation: none;
+  }
+
+  .action-form button {
+    width: auto;
+    min-height: 48px;
+    margin-top: 0;
+    padding: 0 18px;
+  }
+
   .phone-preview {
     border-radius: 34px;
     padding: 18px;
@@ -306,6 +327,33 @@ STYLE = """
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
     margin-top: 18px;
+  }
+
+  .advice-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+  }
+
+  .advice-card {
+    border: 1px solid rgba(225, 48, 108, 0.18);
+  }
+
+  .advice-card .pill {
+    display: inline-block;
+    margin-bottom: 12px;
+  }
+
+  .source-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .source-list a {
+    color: var(--blue);
+    font-weight: 900;
   }
 
   .card {
@@ -650,7 +698,7 @@ STYLE = """
   }
 
   @media (max-width: 920px) {
-    .hero, .predict-layout, .section-grid, .algorithm-lab { grid-template-columns: 1fr; }
+    .hero, .predict-layout, .section-grid, .algorithm-lab, .advice-grid { grid-template-columns: 1fr; }
     .profile { position: static; }
   }
 
@@ -704,6 +752,7 @@ def page_shell(title: str, body: str) -> str:
           <div class="nav-links">
             <a href="/">Home</a>
             <a href="/predictor">Predictor</a>
+            <a href="/advice">Advice</a>
             <a href="/methods">Methods</a>
           </div>
         </nav>
@@ -841,6 +890,37 @@ def metric_bars_html(metrics: dict) -> str:
     return '<div class="bars">' + ''.join(rows) + '</div>'
 
 
+def advice_cards_html(advice: dict) -> str:
+    cards = "".join(
+        f"""
+        <div class="card advice-card">
+          <div class="pill">{item["priority"]}</div>
+          <h2>{item["title"]}</h2>
+          <p><strong>Reason:</strong> {item["why"]}</p>
+          <p><strong>Action:</strong> {item["action"]}</p>
+          <p class="note">Source idea: {item["source"]}</p>
+        </div>
+        """
+        for item in advice["cards"]
+    )
+    return f'<div class="advice-grid">{cards}</div>'
+
+
+def source_list_html(sources: list[dict]) -> str:
+    links = "".join(
+        f'<div class="method"><strong><a href="{source["url"]}" target="_blank" rel="noreferrer">{source["name"]}</a></strong><span>{source["supports"]}</span></div>'
+        for source in sources
+    )
+    return f'<div class="source-list">{links}</div>'
+
+
+def hidden_inputs_html(input_data: dict) -> str:
+    return "".join(
+        f'<input type="hidden" name="{escape(str(key), quote=True)}" value="{escape(str(value), quote=True)}">'
+        for key, value in input_data.items()
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     producer_cards = "".join(f"<div class='method'><strong>{name}</strong><span>Producer</span></div>" for name in PRODUCERS)
@@ -890,9 +970,54 @@ def home() -> str:
         <h2>Research Goal</h2>
         <p>Build a school research tool that can learn from your survey data and estimate obesity-risk probability responsibly.</p>
       </div>
+      <div class="card">
+        <h2>Wellness Advice</h2>
+        <p>After prediction, O-Beast can translate answers into clear habit suggestions using WHO, CDC, and Thai dietary guidance.</p>
+        <a class="button secondary" href="/advice">See advice model</a>
+      </div>
     </section>
     """
     return page_shell("SK Obesity ML Research", body)
+
+
+@app.get("/advice", response_class=HTMLResponse)
+def advice_intro() -> str:
+    example_advice = generate_advice(
+        {
+            "age": 16,
+            "sex": "M",
+            "height_cm": 170,
+            "weight_kg": 65,
+            "physical_activity_hours_per_week": 3,
+            "screen_time_hours_per_day": 5,
+            "sleep_hours": 7,
+            "fast_food_meals_per_week": 2,
+            "sugary_drinks_per_day": 1,
+            "family_history_obesity": 0,
+        },
+        {"obesity_probability": 0.25},
+    )
+    body = f"""
+    <section class="card">
+      <div class="kicker">Wellness advice model</div>
+      <h1>Advice Based on Your Answers</h1>
+      <p class="lead">
+        This page uses a transparent rule-based model. It does not diagnose disease; it turns lifestyle answers into
+        practical wellness suggestions using trustworthy public-health references.
+      </p>
+      <div class="actions">
+        <a class="button" href="/predictor">Start with your answers</a>
+        <a class="button secondary" href="/methods">Review ML methods</a>
+      </div>
+    </section>
+    {advice_cards_html(example_advice)}
+    <section class="card" style="margin-top:18px">
+      <h2>References used</h2>
+      <p class="note">These are the evidence sources behind the rule-based advice engine.</p>
+      {source_list_html(example_advice["sources"])}
+    </section>
+    """
+    return page_shell("Advice - O-Beast", body)
 
 
 @app.get("/methods", response_class=HTMLResponse)
@@ -983,6 +1108,58 @@ def predict_api(payload: ObesityInput) -> dict:
     return predict_probability(payload.model_dump())
 
 
+@app.post("/advice", response_class=HTMLResponse)
+def advice_from_form(
+    age: int = Form(...),
+    sex: str = Form(...),
+    height_cm: float = Form(...),
+    weight_kg: float = Form(...),
+    physical_activity_hours_per_week: float = Form(...),
+    screen_time_hours_per_day: float = Form(...),
+    sleep_hours: float = Form(...),
+    fast_food_meals_per_week: int = Form(...),
+    sugary_drinks_per_day: float = Form(...),
+    family_history_obesity: int = Form(...),
+) -> str:
+    input_data = {
+        "age": age,
+        "sex": sex,
+        "height_cm": height_cm,
+        "weight_kg": weight_kg,
+        "physical_activity_hours_per_week": physical_activity_hours_per_week,
+        "screen_time_hours_per_day": screen_time_hours_per_day,
+        "sleep_hours": sleep_hours,
+        "fast_food_meals_per_week": fast_food_meals_per_week,
+        "sugary_drinks_per_day": sugary_drinks_per_day,
+        "family_history_obesity": family_history_obesity,
+    }
+    result = predict_probability(input_data)
+    advice = generate_advice(input_data, result)
+    percent = round(result["obesity_probability"] * 100, 1)
+    body = f"""
+    <section class="card">
+      <div class="kicker">{advice["focus"]}</div>
+      <h1>Your Wellness Advice</h1>
+      <p class="lead">
+        Prediction estimate: <strong>{percent}%</strong> obesity-risk probability, with calculated BMI <strong>{advice["bmi"]}</strong>.
+        The advice below is based on your answers and public-health guidance.
+      </p>
+      <p class="note">{advice["disclaimer"]}</p>
+    </section>
+    {advice_cards_html(advice)}
+    <section class="card" style="margin-top:18px">
+      <h2>Why these sources?</h2>
+      <p class="note">The advice engine uses official international and public-health references rather than random internet tips.</p>
+      {source_list_html(advice["sources"])}
+      <div class="actions">
+        <a class="button" href="/predictor">Try another input</a>
+        <a class="button secondary" href="/methods">See methods</a>
+      </div>
+    </section>
+    """
+    return page_shell("Advice - O-Beast", body)
+
+
 @app.post("/predict-form", response_class=HTMLResponse)
 def predict_form(
     age: int = Form(...),
@@ -996,20 +1173,19 @@ def predict_form(
     sugary_drinks_per_day: float = Form(...),
     family_history_obesity: int = Form(...),
 ) -> str:
-    result = predict_probability(
-        {
-            "age": age,
-            "sex": sex,
-            "height_cm": height_cm,
-            "weight_kg": weight_kg,
-            "physical_activity_hours_per_week": physical_activity_hours_per_week,
-            "screen_time_hours_per_day": screen_time_hours_per_day,
-            "sleep_hours": sleep_hours,
-            "fast_food_meals_per_week": fast_food_meals_per_week,
-            "sugary_drinks_per_day": sugary_drinks_per_day,
-            "family_history_obesity": family_history_obesity,
-        }
-    )
+    input_data = {
+        "age": age,
+        "sex": sex,
+        "height_cm": height_cm,
+        "weight_kg": weight_kg,
+        "physical_activity_hours_per_week": physical_activity_hours_per_week,
+        "screen_time_hours_per_day": screen_time_hours_per_day,
+        "sleep_hours": sleep_hours,
+        "fast_food_meals_per_week": fast_food_meals_per_week,
+        "sugary_drinks_per_day": sugary_drinks_per_day,
+        "family_history_obesity": family_history_obesity,
+    }
+    result = predict_probability(input_data)
     percent = round(result["obesity_probability"] * 100, 1)
     reason = best_model_reason(result)
     metric_bars = metric_bars_html(result.get("metrics", {}))
@@ -1035,6 +1211,10 @@ def predict_form(
       <p>{result["disclaimer"]}</p>
       <div class="actions" style="justify-content:center">
         <a class="button" href="/predictor">Try another input</a>
+        <form class="action-form" action="/advice" method="post">
+          {hidden_inputs_html(input_data)}
+          <button type="submit">Get wellness advice</button>
+        </form>
         <a class="button secondary" href="/methods">See methods</a>
       </div>
     </section>

@@ -58,3 +58,9 @@ The training pipeline now uses a safer research prototype workflow:
 - The UI describes the selected model as the best model for the current training data, not as a universal medical truth.
 
 The included sample CSV is intentionally tiny and exists only to prove the app and algorithms run. Real conclusions should wait for the completed experimental dataset.
+
+## Wellness Advice Page
+
+The app includes an educational rule-based advice page. It uses the user's answers plus the model probability to suggest practical wellness habits for activity, sedentary time, sleep, sugary drinks, fast food, BMI awareness, and family-history awareness.
+
+The advice rules are intentionally transparent and are based on public-health references from WHO, CDC, and Thai food-based dietary guidance. They are not a diagnosis or treatment plan.
