@@ -451,14 +451,18 @@ STYLE = """
 
   .result-card {
     width: min(560px, 100%);
-    margin: 34px auto;
+    margin: 88px auto 34px;
     padding: 24px;
     text-align: center;
   }
 
+  .result-card .ring {
+    margin: 28px auto 24px;
+  }
+
   .band {
     width: fit-content;
-    margin: 14px auto;
+    margin: 24px auto 26px;
     border-radius: 999px;
     padding: 9px 14px;
     color: white;
@@ -544,17 +548,23 @@ STYLE = """
   .bars {
     display: grid;
     gap: 8px;
-    margin-top: 12px;
+    margin-top: 24px;
   }
 
   .bar-row {
     display: grid;
-    grid-template-columns: 150px 1fr 52px;
-    gap: 10px;
+    grid-template-columns: minmax(210px, 0.42fr) minmax(150px, 1fr) 52px;
+    gap: 12px;
     align-items: center;
     color: var(--muted);
     font-size: 13px;
     font-weight: 800;
+  }
+
+  .bar-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
   }
 
   .bar-track {
@@ -578,6 +588,14 @@ STYLE = """
     padding: 16px;
     background: rgba(255, 255, 255, 0.80);
     text-align: left;
+  }
+
+  .reason-box p {
+    margin: 0 0 16px;
+  }
+
+  .reason-box p:last-child {
+    margin-bottom: 0;
   }
 
   @keyframes pageIn {
