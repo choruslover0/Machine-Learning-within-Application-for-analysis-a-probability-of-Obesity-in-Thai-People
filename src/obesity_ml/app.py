@@ -24,6 +24,7 @@ METHODS = [
     ("Logistic Regression", "Baseline medical-risk model; easy to explain."),
     ("Support Vector Machine", "Finds a strong boundary between risk groups."),
     ("Random Forest", "Many decision trees vote together; robust for survey data."),
+    ("Naive Bayes", "A simple probability baseline: each answer gives evidence, then the model combines the evidence."),
     ("Neural Network", "Learns nonlinear patterns across lifestyle and body features."),
     ("XGBoost", "Gradient-boosted trees; often strong on tabular health data."),
 ]
@@ -667,6 +668,31 @@ STYLE = """
     margin-bottom: 0;
   }
 
+  .metric-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: left;
+  }
+
+  .metric-table th, .metric-table td {
+    padding: 8px 10px;
+    background: rgba(244, 244, 245, 0.76);
+  }
+
+  .metric-table th:first-child, .metric-table td:first-child {
+    border-radius: 12px 0 0 12px;
+    font-weight: 900;
+    color: var(--ink);
+  }
+
+  .metric-table th:last-child, .metric-table td:last-child {
+    border-radius: 0 12px 12px 0;
+  }
+
   @keyframes pageIn {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
@@ -807,6 +833,17 @@ def algorithm_visual_html() -> str:
             """,
         ),
         (
+            "Naive Bayes",
+            "Treats each answer like a clue and combines the clues into one probability.",
+            """
+            <div class="algo-visual">
+              <span class="node" style="left:12%; top:20%">A</span><span class="node" style="left:12%; top:58%">F</span>
+              <span class="node" style="left:42%; top:39%">P</span><span class="node" style="left:74%; top:39%">%</span>
+              <span class="line-viz" style="top:37%; transform:rotate(12deg)"></span><span class="line-viz" style="top:59%; transform:rotate(-12deg)"></span>
+            </div>
+            """,
+        ),
+        (
             "Neural Network",
             "Passes information through connected layers and adjusts the connections after mistakes.",
             """
@@ -829,7 +866,7 @@ def algorithm_visual_html() -> str:
         ),
         (
             "SMOTE",
-            "Creates realistic synthetic minority examples so training is less biased by uneven data.",
+            "Creates synthetic minority examples so training is less biased by uneven data.",
             """
             <div class="algo-visual">
               <span class="dot" style="left:22%; top:35%"></span><span class="dot" style="left:42%; top:40%"></span>
@@ -851,6 +888,7 @@ def _ranked_metrics(metrics: dict) -> list[tuple[str, dict]]:
         key=lambda item: (
             item[1].get("roc_auc", 0),
             item[1].get("f1", 0),
+            -item[1].get("extreme_probability_rate", 0),
             -item[1].get("brier_score", 1),
         ),
         reverse=True,
@@ -867,11 +905,11 @@ def best_model_reason(result: dict) -> str:
     best_metrics = metrics[best_name]
     runner_name = ranked[1][0] if len(ranked) > 1 else None
     brier = best_metrics.get("brier_score")
-    brier_text = f" and the lowest Brier score ({brier:.4f}), meaning its probability estimates had lower error on validation data" if isinstance(brier, (int, float)) else ""
+    brier_text = f" with a Brier score of {brier:.4f}" if isinstance(brier, (int, float)) else ""
     if runner_name:
         return (
             f"{best_name} is selected for the current training data because the tournament sorts models by "
-            f"cross-validated ROC-AUC first, F1 score second, and Brier score third. "
+            f"cross-validated ROC-AUC first, F1 score second, fewer extreme probabilities third, and Brier score fourth. "
             f"It stayed at the top of that rule{brier_text}. The nearest comparison model in this run is {runner_name}."
         )
     return f"{best_name} is selected for the current training data under the current tournament rule."
@@ -888,6 +926,28 @@ def metric_bars_html(metrics: dict) -> str:
             f'<div class="bar-row"><span>{name}</span><div class="bar-track"><div class="bar-fill" style="--score:{percent}%"></div></div><strong>{percent}%</strong></div>'
         )
     return '<div class="bars">' + ''.join(rows) + '</div>'
+
+
+def metric_table_html(metrics: dict) -> str:
+    if not metrics:
+        return ""
+    rows = []
+    for name, values in _ranked_metrics(metrics):
+        rows.append(
+            "<tr>"
+            f"<td>{escape(name)}</td>"
+            f"<td>{values.get('accuracy', 0):.2f}</td>"
+            f"<td>{values.get('kappa', 0):.2f}</td>"
+            f"<td>{values.get('sensitivity', 0):.2f}</td>"
+            f"<td>{values.get('specificity', 0):.2f}</td>"
+            "</tr>"
+        )
+    return (
+        '<table class="metric-table">'
+        "<thead><tr><th>Model</th><th>Accuracy</th><th>Kappa</th><th>Sensitivity</th><th>Specificity</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table>"
+    )
 
 
 def advice_cards_html(advice: dict) -> str:
@@ -945,7 +1005,7 @@ def home() -> str:
         <h2 style="text-align:center">Risk feed</h2>
         <div class="mini-stat">
           <div><strong>10</strong><span>inputs</span></div>
-          <div><strong>6</strong><span>methods</span></div>
+          <div><strong>7</strong><span>methods</span></div>
           <div><strong>%</strong><span>output</span></div>
         </div>
         <div class="story"><div class="story-icon">A</div><div><strong>Activity</strong><span>exercise and screen habits</span></div></div>
@@ -1047,7 +1107,8 @@ def methods() -> str:
       <p class="lead">
         The pipeline follows the direction of your Notion references: compare logistic regression with
         modern machine-learning models, balance data when classes are uneven, and keep the winning
-        method visible for research transparency. Model selection now uses cross-validation on the training split.
+        method visible for research transparency. It also follows the E3S obesity ML comparison style by
+        reporting Accuracy, Kappa, Sensitivity, and Specificity in addition to probability metrics.
       </p>
       {methods_html()}
     </section>
@@ -1059,6 +1120,8 @@ def methods() -> str:
       <div class="card"><h2>Validation strategy</h2><p>{validation_strategy}</p></div>
       <div class="card"><h2>Balancing strategy</h2><p>{resampling_strategy}</p></div>
       <div class="card"><h2>Dataset note</h2><p>{dataset_warning or "Ready for real dataset."}</p></div>
+      <div class="card"><h2>Risk tiers</h2><p>Output now uses five probability tiers: very low, low, moderate, high, and very high.</p></div>
+      <div class="card"><h2>Form import</h2><p>The code can normalize both Google Form schemas and mark missing cross-form questions before later training.</p></div>
     </section>
     """
     return page_shell("Methods - SK Obesity ML", body)
@@ -1189,13 +1252,15 @@ def predict_form(
     percent = round(result["obesity_probability"] * 100, 1)
     reason = best_model_reason(result)
     metric_bars = metric_bars_html(result.get("metrics", {}))
+    metric_table = metric_table_html(result.get("metrics", {}))
     dataset_warning_html = f"<p>{result['dataset_warning']}</p>" if result.get("dataset_warning") else ""
     body = f"""
     <section class="card result-card">
       <div class="pill">Prediction result</div>
       <div class="ring" style="--percent:{percent}%"><div class="prob">{percent}%</div></div>
       <h1 style="font-size:38px">Estimated Probability</h1>
-      <div class="band">{result["risk_band"].title()} risk band</div>
+      <div class="band">{result["risk_tier_label"]}</div>
+      <p class="note">Tier range: {result["risk_tier_range"]}. Coarse band: {result["risk_band"].title()}.</p>
       <div class="reason-box">
         <h2>Why this algorithm is best</h2>
         <p>Winning model: <strong>{result["base_model_name"]}</strong></p>
@@ -1204,8 +1269,9 @@ def predict_form(
       </div>
       <div class="reason-box" style="margin-top:14px">
         <h2>Model tournament scores</h2>
-        <p>These bars use cross-validation on the current training data. They are not universal medical accuracy claims.</p>
+        <p>These bars use cross-validation ROC-AUC on the current training data. The table also reports Accuracy, Kappa, Sensitivity, and Specificity like the reference paper.</p>
         {metric_bars}
+        {metric_table}
       </div>
       {dataset_warning_html}
       <p>{result["disclaimer"]}</p>

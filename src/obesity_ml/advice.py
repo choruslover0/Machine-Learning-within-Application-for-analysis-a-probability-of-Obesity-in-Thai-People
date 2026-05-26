@@ -1,6 +1,7 @@
 import pandas as pd
 
 from obesity_ml.features import add_engineered_features
+from obesity_ml.risk_tiers import asian_bmi_risk_tier, classify_probability
 
 
 SOURCE_NOTES = [
@@ -32,24 +33,16 @@ SOURCE_NOTES = [
 ]
 
 
-def _bmi_category(bmi: float) -> str:
-    if bmi < 18.5:
-        return "below the usual adult screening range"
-    if bmi < 23:
-        return "in the lower-risk Asian adult screening range"
-    if bmi < 25:
-        return "in the increased-risk Asian adult screening range"
-    if bmi < 30:
-        return "in the high-risk Asian adult screening range"
-    return "in the very-high-risk Asian adult screening range"
-
-
 def _priority_for_probability(probability: float) -> str:
-    if probability >= 0.65:
+    if probability >= 0.80:
+        return "Very high priority"
+    if probability >= 0.60:
         return "High priority"
-    if probability >= 0.35:
-        return "Medium priority"
-    return "Build good habits"
+    if probability >= 0.40:
+        return "Moderate priority"
+    if probability >= 0.20:
+        return "Build good habits"
+    return "Maintenance"
 
 
 def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
@@ -57,15 +50,47 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
     row = framed.iloc[0]
     bmi = float(row["bmi"])
     probability = float(prediction.get("obesity_probability", 0)) if prediction else 0
+    probability_tier = classify_probability(probability)
+    bmi_tier = asian_bmi_risk_tier(bmi)
+    activity = float(row["physical_activity_hours_per_week"])
+    screen_time = float(row["screen_time_hours_per_day"])
+    sleep = float(row["sleep_hours"])
+    sugary_drinks = float(row["sugary_drinks_per_day"])
+    fast_food = float(row["fast_food_meals_per_week"])
+    vegetables = float(row.get("vegetable_frequency", 2))
+    high_calorie = float(row.get("high_calorie_food_frequency", 0))
+    between_meals = float(row.get("food_between_meals_frequency", 1))
+    main_meals = float(row.get("main_meals_per_day", 3))
+    smoke = float(row.get("smoke", 0))
 
     cards = []
-    if float(row["physical_activity_hours_per_week"]) < 2.5:
+    cards.append(
+        {
+            "title": "Your fine risk tier",
+            "priority": probability_tier["risk_tier_label"],
+            "why": f"The model probability falls in the {probability_tier['risk_tier_range']} range. {probability_tier['risk_tier_explanation']}",
+            "action": "Use this tier to choose how strongly to focus on habits. It is a research estimate, not a diagnosis.",
+            "source": "Model probability tiering",
+        }
+    )
+
+    if activity < 1:
+        cards.append(
+            {
+                "title": "Start with very small movement goals",
+                "priority": "High impact habit",
+                "why": "Your activity answer is under 1 hour per week, so even small increases can improve the weekly pattern.",
+                "action": "Try 10 minutes of walking or sports practice on 4-5 days this week, then increase slowly.",
+                "source": "WHO physical activity guidelines",
+            }
+        )
+    elif activity < 2.5:
         cards.append(
             {
                 "title": "Move more during the week",
                 "priority": "High impact habit",
                 "why": "Your activity answer is below a common public-health target for adults and older teens.",
-                "action": "Start with 10-15 minute walks or active breaks, then build toward at least 150 minutes of moderate movement per week when appropriate.",
+                "action": "Add 15-20 minutes of moderate movement on 3 extra days, aiming toward 150 minutes per week when appropriate.",
                 "source": "WHO physical activity guidelines",
             }
         )
@@ -80,7 +105,17 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             }
         )
 
-    if float(row["screen_time_hours_per_day"]) >= 6:
+    if screen_time >= 8:
+        cards.append(
+            {
+                "title": "Reduce very long screen sessions",
+                "priority": "Daily routine",
+                "why": "Your answer suggests very long daily sedentary time, which can crowd out sleep and activity.",
+                "action": "Protect one screen-free block each day and take a 3-5 minute movement break after each study or gaming session.",
+                "source": "WHO sedentary behaviour guidance",
+            }
+        )
+    elif screen_time >= 6:
         cards.append(
             {
                 "title": "Break up long sitting time",
@@ -91,7 +126,17 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             }
         )
 
-    if float(row["sleep_hours"]) < 7:
+    if sleep < 6:
+        cards.append(
+            {
+                "title": "Protect sleep first",
+                "priority": "Recovery",
+                "why": "Your sleep answer is very short. Short sleep can make appetite, mood, school focus, and movement habits harder.",
+                "action": "Move bedtime earlier by 15-30 minutes for a week and reduce bright screen use close to bedtime.",
+                "source": "CDC sleep health",
+            }
+        )
+    elif sleep < 7:
         cards.append(
             {
                 "title": "Improve sleep consistency",
@@ -102,7 +147,17 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             }
         )
 
-    if float(row["sugary_drinks_per_day"]) >= 1:
+    if sugary_drinks >= 2:
+        cards.append(
+            {
+                "title": "Cut sugary drinks in half first",
+                "priority": "Nutrition",
+                "why": "Two or more sweet drinks per day can add many extra calories and free sugars without strong fullness.",
+                "action": "For the first target, reduce by half and replace the removed drinks with water or unsweetened tea.",
+                "source": "WHO sugars guideline",
+            }
+        )
+    elif sugary_drinks >= 1:
         cards.append(
             {
                 "title": "Reduce sugary drinks step by step",
@@ -113,7 +168,17 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             }
         )
 
-    if int(row["fast_food_meals_per_week"]) >= 3:
+    if fast_food >= 6:
+        cards.append(
+            {
+                "title": "Replace some frequent fast-food meals",
+                "priority": "Food pattern",
+                "why": "Fast-food frequency is high, so the first goal is reducing frequency rather than trying to be perfect.",
+                "action": "Swap 2 meals per week for a simple balanced meal: rice or grains, vegetables, lean protein, fruit, and water.",
+                "source": "Thailand food-based dietary guidance",
+            }
+        )
+    elif fast_food >= 3:
         cards.append(
             {
                 "title": "Make fast food less frequent",
@@ -121,6 +186,61 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
                 "why": "Frequent fast-food meals can increase energy intake and make vegetables, fruits, and balanced meals harder to fit in.",
                 "action": "Plan a few Thai-style balanced meals around rice or grains, vegetables, lean protein, fruit, and less fried or sweet food.",
                 "source": "Thailand food-based dietary guidance",
+            }
+        )
+
+    if high_calorie >= 1:
+        cards.append(
+            {
+                "title": "Watch frequent high-calorie food",
+                "priority": "Food choice",
+                "why": "Your second-form style answer says high-calorie food is frequent, which matches an important variable in obesity survey research.",
+                "action": "Keep the food you enjoy, but reduce portion size or frequency and pair meals with vegetables or fruit.",
+                "source": "E3S obesity ML lifestyle-variable study",
+            }
+        )
+
+    if vegetables < 2:
+        cards.append(
+            {
+                "title": "Add vegetables to one meal first",
+                "priority": "Food balance",
+                "why": "Vegetable frequency is low. In the reference paper, vegetable intake was one of the useful lifestyle variables.",
+                "action": "Add one vegetable serving to lunch or dinner before changing the whole diet.",
+                "source": "Thailand food-based dietary guidance",
+            }
+        )
+
+    if between_meals >= 3:
+        cards.append(
+            {
+                "title": "Plan snacks between meals",
+                "priority": "Eating pattern",
+                "why": "Frequent food between meals was one of the strongest variables in the reference obesity ML paper.",
+                "action": "Prepare planned snacks such as fruit, yogurt, or nuts, and avoid turning every break into a high-calorie snack.",
+                "source": "E3S obesity ML lifestyle-variable study",
+            }
+        )
+
+    if main_meals > 4:
+        cards.append(
+            {
+                "title": "Check meal frequency",
+                "priority": "Eating pattern",
+                "why": "Your main-meal answer is unusually high, so the app flags it for review rather than treating it as automatically bad.",
+                "action": "Check whether this answer means true meals or snacks. For research data, this may need cleaning before training.",
+                "source": "Survey data quality check",
+            }
+        )
+
+    if smoke >= 1:
+        cards.append(
+            {
+                "title": "Do not use smoking for weight control",
+                "priority": "Health safety",
+                "why": "Smoking is a major health risk and should not be treated as a weight-management strategy.",
+                "action": "If smoking is real in the answer, talk with a trusted adult or health professional about support.",
+                "source": "Public-health safety guidance",
             }
         )
 
@@ -139,7 +259,7 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
         {
             "title": "Understand your BMI signal",
             "priority": _priority_for_probability(probability),
-            "why": f"Your calculated BMI is {bmi:.1f}, which is {_bmi_category(bmi)}. BMI is a screening clue, not a diagnosis.",
+            "why": f"Your calculated BMI is {bmi:.1f}. {bmi_tier['detail']} BMI is a screening clue, not a diagnosis.",
             "action": "Use BMI together with lifestyle answers, waist/health measurements if available, and professional advice when needed.",
             "source": "CDC BMI guidance",
         }
@@ -159,6 +279,7 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
     return {
         "bmi": round(bmi, 1),
         "focus": _priority_for_probability(probability),
+        "risk_tier": probability_tier["risk_tier_label"],
         "cards": cards,
         "sources": SOURCE_NOTES,
         "disclaimer": "Educational wellness advice only; it is not a diagnosis or treatment plan.",

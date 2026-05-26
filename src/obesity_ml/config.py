@@ -17,6 +17,15 @@ NUMERIC_FEATURES = [
     "sleep_hours",
     "fast_food_meals_per_week",
     "sugary_drinks_per_day",
+    "high_calorie_food_frequency",
+    "vegetable_frequency",
+    "main_meals_per_day",
+    "food_between_meals_frequency",
+    "smoke",
+    "physical_activity_missing",
+    "screen_time_missing",
+    "fast_food_missing",
+    "sugary_drinks_missing",
 ]
 
 CATEGORICAL_FEATURES = [
@@ -37,3 +46,14 @@ REQUIRED_INPUT_COLUMNS = [
     "family_history_obesity",
 ]
 
+OPTIONAL_INPUT_DEFAULTS = {
+    "high_calorie_food_frequency": 0.0,
+    "vegetable_frequency": 2.0,
+    "main_meals_per_day": 3.0,
+    "food_between_meals_frequency": 1.0,
+    "smoke": 0.0,
+    "physical_activity_missing": 0.0,
+    "screen_time_missing": 0.0,
+    "fast_food_missing": 0.0,
+    "sugary_drinks_missing": 0.0,
+}

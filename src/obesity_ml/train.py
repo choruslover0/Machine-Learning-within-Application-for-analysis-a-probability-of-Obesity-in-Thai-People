@@ -7,17 +7,21 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.frozen import FrozenEstimator
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
     brier_score_loss,
+    cohen_kappa_score,
+    confusion_matrix,
     f1_score,
     precision_score,
     recall_score,
     roc_auc_score,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
+from sklearn.naive_bayes import GaussianNB
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -55,11 +59,24 @@ REFERENCE_NOTES = [
 
 
 def build_preprocessor() -> ColumnTransformer:
+    numeric_pipeline = Pipeline(
+        steps=[
+            ("impute", SimpleImputer(strategy="median")),
+            ("scale", StandardScaler()),
+        ]
+    )
+    categorical_pipeline = Pipeline(
+        steps=[
+            ("impute", SimpleImputer(strategy="most_frequent")),
+            ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+        ]
+    )
     return ColumnTransformer(
         transformers=[
-            ("numeric", StandardScaler(), NUMERIC_FEATURES),
-            ("categorical", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
-        ]
+            ("numeric", numeric_pipeline, NUMERIC_FEATURES),
+            ("categorical", categorical_pipeline, CATEGORICAL_FEATURES),
+        ],
+        sparse_threshold=0.0,
     )
 
 
@@ -107,6 +124,10 @@ def candidate_models(y_train: pd.Series) -> dict[str, Pipeline]:
             ),
             y_train,
         ),
+        "naive_bayes_gaussian": make_pipeline(
+            GaussianNB(var_smoothing=1e-2),
+            y_train,
+        ),
         "neural_network_mlp": make_pipeline(
             MLPClassifier(
                 hidden_layer_sizes=(32, 16),
@@ -137,15 +158,36 @@ def candidate_models(y_train: pd.Series) -> dict[str, Pipeline]:
     return candidates
 
 
+def specificity_score(y_true: pd.Series, prediction) -> float:
+    labels = sorted(set(y_true) | set(prediction))
+    if len(labels) == 2:
+        return recall_score(y_true, prediction, pos_label=0, zero_division=0)
+
+    matrix = confusion_matrix(y_true, prediction, labels=labels)
+    specificities = []
+    total = matrix.sum()
+    for index in range(len(labels)):
+        true_negative = total - (matrix[index, :].sum() + matrix[:, index].sum() - matrix[index, index])
+        false_positive = matrix[:, index].sum() - matrix[index, index]
+        denominator = true_negative + false_positive
+        specificities.append(true_negative / denominator if denominator else 0.0)
+    return float(sum(specificities) / len(specificities)) if specificities else 0.0
+
+
 def evaluate_probabilities(y_true: pd.Series, probability) -> dict[str, float]:
     prediction = (probability >= 0.5).astype(int)
+    probability_series = pd.Series(probability)
     metrics = {
         "accuracy": accuracy_score(y_true, prediction),
         "balanced_accuracy": balanced_accuracy_score(y_true, prediction),
+        "kappa": cohen_kappa_score(y_true, prediction),
+        "sensitivity": recall_score(y_true, prediction, zero_division=0),
+        "specificity": specificity_score(y_true, prediction),
         "precision": precision_score(y_true, prediction, zero_division=0),
         "recall": recall_score(y_true, prediction, zero_division=0),
         "f1": f1_score(y_true, prediction, zero_division=0),
         "brier_score": brier_score_loss(y_true, probability),
+        "extreme_probability_rate": float(((probability_series <= 0.01) | (probability_series >= 0.99)).mean()),
     }
     metrics["roc_auc"] = roc_auc_score(y_true, probability) if len(set(y_true)) > 1 else float("nan")
     return metrics
@@ -156,11 +198,11 @@ def evaluate_model(model: Pipeline, x_test: pd.DataFrame, y_test: pd.Series) -> 
     return evaluate_probabilities(y_test, probability)
 
 
-def score_for_selection(metrics: dict[str, float]) -> tuple[float, float, float]:
+def score_for_selection(metrics: dict[str, float]) -> tuple[float, float, float, float]:
     roc_auc = metrics["roc_auc"]
     if roc_auc != roc_auc:  # NaN check
         roc_auc = 0.0
-    return (roc_auc, metrics["f1"], -metrics["brier_score"])
+    return (roc_auc, metrics["f1"], -metrics.get("extreme_probability_rate", 0.0), -metrics["brier_score"])
 
 
 def cross_validation_strategy(y_train: pd.Series) -> StratifiedKFold | None:
@@ -246,7 +288,7 @@ def train(data_path: Path, model_path: Path = MODEL_PATH) -> dict[str, object]:
         "candidate_methods": list(validation_results.keys()),
         "xgboost_status": "enabled" if XGBClassifier is not None else f"disabled: {XGBOOST_IMPORT_ERROR}",
         "reference_notes": REFERENCE_NOTES,
-        "selection_rule": "Choose highest cross-validated ROC-AUC, then F1, then lowest Brier score.",
+        "selection_rule": "Choose highest cross-validated ROC-AUC, then F1, then fewer extreme probabilities, then lowest Brier score; report Accuracy, Kappa, Sensitivity, and Specificity like obesity ML comparison papers.",
         "validation_strategy": "Stratified cross-validation on the training split; final test split is kept for reporting only.",
         "resampling_strategy": "SMOTENC before preprocessing for categorical-safe balancing." if can_use_smote(y_train) else "Class weights/fallback only; SMOTENC skipped because data is too small or unavailable.",
         "dataset_warning": dataset_warning(len(df)),
