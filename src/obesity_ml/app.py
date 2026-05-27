@@ -550,18 +550,118 @@ STYLE = """
   }
 
   .algo-card {
-    min-height: 210px;
+    min-height: 316px;
     overflow: hidden;
   }
 
   .algo-visual {
-    height: 96px;
+    height: 154px;
     border: 1px solid var(--line);
     border-radius: 18px;
-    background: rgba(255, 255, 255, 0.70);
+    background:
+      linear-gradient(90deg, rgba(24,24,27,.06) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(0deg, rgba(24,24,27,.06) 1px, transparent 1px) 0 0 / 28px 28px,
+      rgba(255, 255, 255, 0.76);
     margin-bottom: 12px;
     position: relative;
     overflow: hidden;
+  }
+
+  .algo-visual::before {
+    content: "";
+    position: absolute;
+    inset: 14px;
+    border-left: 2px solid rgba(24,24,27,.16);
+    border-bottom: 2px solid rgba(24,24,27,.16);
+    pointer-events: none;
+  }
+
+  .viz-chip {
+    position: absolute;
+    z-index: 2;
+    border-radius: 999px;
+    padding: 5px 8px;
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.90);
+    border: 1px solid var(--line);
+    font-size: 11px;
+    font-weight: 1000;
+    box-shadow: 0 8px 18px rgba(21, 21, 26, 0.08);
+  }
+
+  .viz-chip.hot {
+    color: white;
+    border: 0;
+    background: linear-gradient(135deg, var(--hot), var(--sun));
+  }
+
+  .viz-chip.cool {
+    color: white;
+    border: 0;
+    background: linear-gradient(135deg, var(--blue), var(--violet));
+  }
+
+  .viz-arrow {
+    position: absolute;
+    z-index: 1;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--violet), var(--hot), var(--sun));
+    transform-origin: left center;
+  }
+
+  .viz-arrow::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    border-top: 3px solid var(--sun);
+    border-right: 3px solid var(--sun);
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  .flow-step {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    color: white;
+    background: linear-gradient(135deg, var(--violet), var(--hot));
+    font-size: 12px;
+    font-weight: 1000;
+    box-shadow: 0 12px 28px rgba(225, 48, 108, 0.20);
+    animation: nodePop 2.2s ease-in-out infinite;
+  }
+
+  .algo-points {
+    display: grid;
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .algo-point {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 8px;
+    align-items: start;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .algo-point strong {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    color: white;
+    background: linear-gradient(135deg, var(--hot), var(--sun));
+    font-size: 11px;
   }
 
   .dot {
@@ -572,6 +672,14 @@ STYLE = """
     background: var(--hot);
     box-shadow: 0 0 0 4px rgba(225, 48, 108, 0.14);
     animation: dotPulse 1.9s ease-in-out infinite;
+  }
+
+  .dot.ghost {
+    width: 10px;
+    height: 10px;
+    background: #22c55e;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
+    opacity: 0.92;
   }
 
   .dot.alt {
@@ -590,6 +698,15 @@ STYLE = """
     background: linear-gradient(90deg, var(--violet), var(--hot), var(--sun));
     transform: rotate(-14deg);
     animation: scanLine 2.4s ease-in-out infinite alternate;
+  }
+
+  .line-viz.vertical {
+    width: 4px;
+    height: 112px;
+    left: 50%;
+    right: auto;
+    top: 18px;
+    transform: rotate(12deg);
   }
 
   .tree-viz {
@@ -802,83 +919,120 @@ def algorithm_visual_html() -> str:
     cards = [
         (
             "Logistic Regression",
-            "Draws one best line that separates lower-risk and higher-risk examples.",
+            "One smooth equation turns the answers into a probability.",
             """
             <div class="algo-visual">
-              <span class="dot" style="left:18%; top:62%"></span><span class="dot" style="left:32%; top:54%"></span>
-              <span class="dot alt" style="left:62%; top:28%"></span><span class="dot alt" style="left:76%; top:34%"></span>
+              <span class="viz-chip" style="left:18px; bottom:18px">lower BMI</span>
+              <span class="viz-chip hot" style="right:16px; top:16px">higher risk</span>
+              <span class="dot" style="left:27%; top:66%"></span><span class="dot" style="left:38%; top:55%"></span>
+              <span class="dot alt" style="left:66%; top:30%"></span><span class="dot alt" style="left:78%; top:36%"></span>
               <span class="line-viz"></span>
             </div>
             """,
+            ["Takes weighted survey answers", "Draws one probability boundary", "Easy for professor to explain"],
         ),
         (
             "Support Vector Machine",
-            "Finds the widest safe gap between groups so new answers land on one side.",
+            "Looks for the widest gap between lower-risk and higher-risk examples.",
             """
             <div class="algo-visual">
-              <span class="dot" style="left:16%; top:32%"></span><span class="dot" style="left:28%; top:54%"></span>
-              <span class="dot alt" style="left:68%; top:36%"></span><span class="dot alt" style="left:78%; top:58%"></span>
-              <span class="line-viz" style="top:48%; transform:rotate(18deg)"></span>
+              <span class="viz-chip cool" style="left:16px; top:18px">group A</span>
+              <span class="viz-chip hot" style="right:16px; bottom:18px">group B</span>
+              <span class="dot" style="left:21%; top:35%"></span><span class="dot" style="left:32%; top:57%"></span>
+              <span class="dot alt" style="left:69%; top:38%"></span><span class="dot alt" style="left:79%; top:61%"></span>
+              <span class="line-viz vertical"></span>
+              <span class="viz-chip" style="left:44%; top:72%">wide gap</span>
             </div>
             """,
+            ["Compares groups by distance", "Uses support examples near the boundary", "Good for clean separation"],
         ),
         (
             "Random Forest",
-            "Uses many small decision trees, then lets them vote on the final risk.",
+            "Many small trees vote together, so one strange answer does not control everything.",
             """
             <div class="algo-visual">
               <span class="tree-viz"></span>
-              <span class="node" style="left:45%; top:8%">Q</span><span class="node" style="left:21%; top:60%">A</span><span class="node" style="left:69%; top:60%">B</span>
+              <span class="node" style="left:45%; top:8%">Q</span><span class="node" style="left:18%; top:58%">L</span><span class="node" style="left:44%; top:58%">M</span><span class="node" style="left:70%; top:58%">H</span>
+              <span class="viz-chip hot" style="right:12px; top:18px">vote</span>
             </div>
             """,
+            ["Tree 1 asks about BMI", "Tree 2 asks about habits", "Final answer is the vote"],
         ),
         (
             "Naive Bayes",
-            "Treats each answer like a clue and combines the clues into one probability.",
+            "Each answer is a clue, then the clues are multiplied into a probability.",
             """
             <div class="algo-visual">
-              <span class="node" style="left:12%; top:20%">A</span><span class="node" style="left:12%; top:58%">F</span>
-              <span class="node" style="left:42%; top:39%">P</span><span class="node" style="left:74%; top:39%">%</span>
-              <span class="line-viz" style="top:37%; transform:rotate(12deg)"></span><span class="line-viz" style="top:59%; transform:rotate(-12deg)"></span>
+              <span class="flow-step" style="left:14%; top:24%">BMI</span>
+              <span class="flow-step" style="left:14%; top:66%">food</span>
+              <span class="viz-arrow" style="left:38%; top:44%; width:36%; transform:rotate(-8deg)"></span>
+              <span class="viz-arrow" style="left:38%; top:74%; width:34%; transform:rotate(-24deg)"></span>
+              <span class="flow-step" style="right:12%; top:42%">%</span>
             </div>
             """,
+            ["Counts how common each clue is", "Assumes clues are independent", "Simple baseline for comparison"],
         ),
         (
             "Neural Network",
-            "Passes information through connected layers and adjusts the connections after mistakes.",
+            "Input answers pass through hidden layers that learn nonlinear patterns.",
             """
             <div class="algo-visual">
-              <span class="node" style="left:12%; top:18%">1</span><span class="node" style="left:12%; top:58%">2</span>
-              <span class="node" style="left:45%; top:38%">H</span><span class="node" style="left:78%; top:38%">%</span>
-              <span class="line-viz" style="top:34%; transform:rotate(8deg)"></span><span class="line-viz" style="top:61%; transform:rotate(-8deg)"></span>
+              <span class="viz-chip" style="left:12px; top:12px">inputs</span>
+              <span class="flow-step" style="left:13%; top:38%">10</span>
+              <span class="flow-step" style="left:42%; top:24%">H1</span>
+              <span class="flow-step" style="left:42%; top:64%">H2</span>
+              <span class="flow-step" style="right:12%; top:42%">%</span>
+              <span class="viz-arrow" style="left:29%; top:46%; width:26%; transform:rotate(-17deg)"></span>
+              <span class="viz-arrow" style="left:29%; top:65%; width:26%; transform:rotate(15deg)"></span>
+              <span class="viz-arrow" style="left:58%; top:43%; width:24%; transform:rotate(18deg)"></span>
             </div>
             """,
+            ["Learns combinations of answers", "Updates weights after mistakes", "Useful but needs enough data"],
         ),
         (
             "XGBoost",
-            "Builds trees one after another, where each new tree focuses on fixing previous errors.",
+            "Boosted trees learn in rounds, where each round fixes mistakes from the last one.",
             """
             <div class="algo-visual">
-              <span class="node" style="left:10%; top:36%">1</span><span class="node" style="left:38%; top:36%">2</span><span class="node" style="left:66%; top:36%">3</span>
-              <span class="line-viz" style="top:50%; transform:rotate(0deg)"></span>
+              <span class="flow-step" style="left:10%; top:42%">T1</span>
+              <span class="flow-step" style="left:38%; top:42%">T2</span>
+              <span class="flow-step" style="left:66%; top:42%">T3</span>
+              <span class="viz-arrow" style="left:25%; top:56%; width:20%"></span>
+              <span class="viz-arrow" style="left:53%; top:56%; width:20%"></span>
+              <span class="viz-chip hot" style="right:12px; top:14px">fix errors</span>
             </div>
             """,
+            ["Tree after tree", "Next tree focuses on errors", "Strong for tabular survey data"],
         ),
         (
-            "SMOTE",
-            "Creates synthetic minority examples so training is less biased by uneven data.",
+            "SMOTENC",
+            "Balances uneven classes while keeping category answers like sex and family history valid.",
             """
             <div class="algo-visual">
-              <span class="dot" style="left:22%; top:35%"></span><span class="dot" style="left:42%; top:40%"></span>
-              <span class="dot alt" style="left:32%; top:38%"></span><span class="dot alt" style="left:62%; top:58%"></span>
-              <span class="line-viz" style="top:44%; transform:rotate(9deg)"></span>
+              <span class="viz-chip cool" style="left:14px; top:12px">minority class</span>
+              <span class="dot alt" style="left:23%; top:42%"></span><span class="dot alt" style="left:40%; top:48%"></span>
+              <span class="dot ghost" style="left:31%; top:45%"></span><span class="dot ghost" style="left:49%; top:52%"></span>
+              <span class="viz-chip hot" style="right:12px; top:12px">numeric + category</span>
+              <span class="dot" style="left:68%; top:66%"></span><span class="dot" style="left:78%; top:58%"></span>
+              <span class="viz-arrow" style="left:43%; top:51%; width:24%; transform:rotate(14deg)"></span>
+              <span class="viz-chip" style="left:22%; bottom:14px">new safe samples</span>
             </div>
             """,
+            ["Creates extra minority examples", "Does not make fake half-categories", "Runs before one-hot encoding"],
         ),
     ]
     return '<div class="algorithm-lab">' + ''.join(
-        f'<div class="card algo-card">{visual}<h2>{name}</h2><p>{body}</p></div>'
-        for name, body, visual in cards
+        f"""
+        <div class="card algo-card">
+          {visual}
+          <h2>{name}</h2>
+          <p>{body}</p>
+          <div class="algo-points">
+            {''.join(f'<div class="algo-point"><strong>{index}</strong><span>{point}</span></div>' for index, point in enumerate(points, start=1))}
+          </div>
+        </div>
+        """
+        for name, body, visual, points in cards
     ) + '</div>'
 
 
