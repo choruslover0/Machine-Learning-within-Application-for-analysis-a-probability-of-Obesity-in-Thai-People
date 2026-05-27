@@ -21,7 +21,8 @@ def validate_prediction_frame(df: pd.DataFrame) -> None:
 
 def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
-    height_m = out["height_cm"].astype(float) / 100
+    # Use a small epsilon to avoid division by zero
+    height_m = out["height_cm"].astype(float).clip(lower=1.0) / 100
     out["bmi"] = out["weight_kg"].astype(float) / (height_m**2)
     for column, default in OPTIONAL_INPUT_DEFAULTS.items():
         if column not in out.columns:

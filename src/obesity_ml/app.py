@@ -1037,16 +1037,24 @@ def algorithm_visual_html() -> str:
 
 
 def _ranked_metrics(metrics: dict) -> list[tuple[str, dict]]:
-    return sorted(
-        metrics.items(),
-        key=lambda item: (
-            item[1].get("roc_auc", 0),
-            item[1].get("f1", 0),
-            -item[1].get("extreme_probability_rate", 0),
-            -item[1].get("brier_score", 1),
-        ),
-        reverse=True,
-    )
+    import math
+
+    def sort_key(item):
+        m = item[1]
+        roc_auc = m.get("roc_auc", 0)
+        f1 = m.get("f1", 0)
+        epr = m.get("extreme_probability_rate", 0)
+        brier = m.get("brier_score", 1)
+
+        # Handle NaN values
+        roc_auc = 0.0 if math.isnan(roc_auc) else roc_auc
+        f1 = 0.0 if math.isnan(f1) else f1
+        epr = 0.0 if math.isnan(epr) else epr
+        brier = 1.0 if math.isnan(brier) else brier
+
+        return (roc_auc, f1, -epr, -brier)
+
+    return sorted(metrics.items(), key=sort_key, reverse=True)
 
 
 def best_model_reason(result: dict) -> str:
@@ -1072,10 +1080,14 @@ def best_model_reason(result: dict) -> str:
 def metric_bars_html(metrics: dict) -> str:
     if not metrics:
         return "<p>No metric bars yet. Train the model first.</p>"
+    import math
     rows = []
     for name, values in _ranked_metrics(metrics):
         score = values.get("roc_auc", values.get("f1", 0))
-        percent = max(0, min(100, round(float(score) * 100))) if isinstance(score, (int, float)) else 0
+        if isinstance(score, (int, float)) and not math.isnan(score):
+            percent = max(0, min(100, round(float(score) * 100)))
+        else:
+            percent = 0
         rows.append(
             f'<div class="bar-row"><span>{name}</span><div class="bar-track"><div class="bar-fill" style="--score:{percent}%"></div></div><strong>{percent}%</strong></div>'
         )

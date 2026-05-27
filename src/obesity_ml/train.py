@@ -250,7 +250,8 @@ def train(data_path: Path, model_path: Path = MODEL_PATH) -> dict[str, object]:
     validate_training_frame(df)
     df = add_engineered_features(df)
 
-    x = df.drop(columns=[TARGET_COLUMN])
+    all_features = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+    x = df[all_features]
     y = df[TARGET_COLUMN].astype(int)
 
     stratify = y if y.nunique() == 2 and y.value_counts().min() >= 2 else None
