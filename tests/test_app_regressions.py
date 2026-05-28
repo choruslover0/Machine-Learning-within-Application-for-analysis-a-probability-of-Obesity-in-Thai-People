@@ -338,7 +338,7 @@ class GenerateAdviceTests(unittest.TestCase):
         self.assertIn("sources", advice)
 
     def test_generate_advice_disclaimer_says_not_a_diagnosis(self):
-        """Disclaimer must contain the safety phrase 'not a diagnosis' per CLAUDE.md rules."""
+        """Disclaimer must contain the safety phrase 'not a diagnosis'."""
         from obesity_ml.advice import generate_advice
 
         advice = generate_advice(
