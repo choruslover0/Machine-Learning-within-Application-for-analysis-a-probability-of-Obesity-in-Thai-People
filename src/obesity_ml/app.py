@@ -1,4 +1,6 @@
 from html import escape
+from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
@@ -6,17 +8,47 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from obesity_ml.advice import generate_advice
+from obesity_ml.features import validate_prediction_frame
 from obesity_ml.predict import load_artifact, predict_probability
 
 
 app = FastAPI(title="Obesity Probability ML App")
-app.mount("/static", StaticFiles(directory="src/obesity_ml/static"), name="static")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 PRODUCERS = [
     "Phawich Pilathong",
     "Paphawin Kraipakdeekul",
     "Watcharawee Kengkarunkij",
+]
+
+PRODUCER_PROFILES = [
+    {
+        "name": "Phawich Pilathong",
+        "image": "/static/producer-phawich-pilathong.jpg",
+        "photo_class": "photo-phawich",
+        "contacts": [
+            ("LinkedIn", "https://www.linkedin.com/in/phawich-pilathong-6ba8a1404"),
+            ("Instagram", "https://www.instagram.com/baipad_phawich?igsh=MWNzdnc0ejgzN2c0eA%3D%3D&utm_source=qr"),
+        ],
+    },
+    {
+        "name": "Watcharawee Kengkarunkij",
+        "image": "/static/producer-watcharawee-kengkarunkij.jpg",
+        "photo_class": "photo-watcharawee",
+        "contacts": [
+            ("Instagram", "https://www.instagram.com/padiertart?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="),
+        ],
+    },
+    {
+        "name": "Paphawin Kraipakdeekul",
+        "image": "/static/producer-paphawin-kraipakdeekul.jpg",
+        "photo_class": "photo-paphawin",
+        "contacts": [
+            ("Instagram", "https://www.instagram.com/ppw._.ccopter?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="),
+        ],
+    },
 ]
 
 METHODS = [
@@ -330,6 +362,10 @@ STYLE = """
     margin-top: 18px;
   }
 
+  .support-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .advice-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -355,6 +391,133 @@ STYLE = """
   .source-list a {
     color: var(--blue);
     font-weight: 900;
+  }
+
+  .producers-section {
+    margin-top: 22px;
+    padding: 4px 0 0;
+  }
+
+  .producer-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: end;
+    margin-bottom: 14px;
+  }
+
+  .producer-heading h2 {
+    margin: 0;
+    font-size: clamp(30px, 5vw, 52px);
+    line-height: 0.96;
+    letter-spacing: 0;
+  }
+
+  .producer-heading p {
+    max-width: 430px;
+    margin: 0;
+    color: var(--muted);
+    font-weight: 750;
+    line-height: 1.45;
+  }
+
+  .producer-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .producer-card {
+    position: relative;
+    overflow: hidden;
+    min-height: 448px;
+    border: 1px solid rgba(225, 48, 108, 0.18);
+    border-radius: 26px;
+    background: rgba(255, 255, 255, 0.74);
+    box-shadow: 0 24px 70px rgba(21, 21, 26, 0.12);
+    transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+  }
+
+  .producer-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(225, 48, 108, 0.30);
+    box-shadow: 0 34px 90px rgba(21, 21, 26, 0.18);
+  }
+
+  .producer-photo-wrap {
+    height: 292px;
+    overflow: hidden;
+    background: #f4f4f5;
+  }
+
+  .producer-photo {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 420ms ease;
+  }
+
+  .producer-card:hover .producer-photo {
+    transform: scale(1.04);
+  }
+
+  .photo-phawich {
+    object-position: center 28%;
+  }
+
+  .photo-watcharawee {
+    object-position: 72% 48%;
+  }
+
+  .photo-paphawin {
+    object-position: 53% 34%;
+  }
+
+  .producer-body {
+    padding: 16px;
+  }
+
+  .producer-body h3 {
+    margin: 0;
+    font-size: clamp(20px, 2.5vw, 28px);
+    line-height: 1.05;
+  }
+
+  .producer-body p {
+    margin: 8px 0 14px;
+    color: var(--muted);
+    font-weight: 850;
+  }
+
+  .contact-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .contact-link, .contact-slot {
+    min-height: 40px;
+    border-radius: 999px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 1000;
+    text-decoration: none;
+    line-height: 1;
+  }
+
+  .contact-link {
+    color: white;
+    background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
+    box-shadow: 0 14px 28px rgba(225, 48, 108, 0.20);
+  }
+
+  .contact-slot {
+    display: inline-flex;
+    align-items: center;
+    color: var(--muted);
+    border: 1px dashed rgba(113, 113, 122, 0.44);
+    background: rgba(255, 255, 255, 0.62);
   }
 
   .card {
@@ -549,6 +712,195 @@ STYLE = """
     margin-top: 18px;
   }
 
+  .research-map {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+    gap: 18px;
+    align-items: center;
+    margin-top: 18px;
+    padding: 18px;
+    border: 1px solid rgba(225, 48, 108, 0.18);
+    border-radius: 26px;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.54)),
+      radial-gradient(circle at 88% 12%, rgba(64, 93, 230, 0.16), transparent 30%);
+    overflow: hidden;
+  }
+
+  .pipeline-stack {
+    display: grid;
+    gap: 12px;
+  }
+
+  .pipeline-step {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 12px;
+    align-items: center;
+    min-height: 74px;
+    padding: 13px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.74);
+    box-shadow: 0 18px 34px rgba(21, 21, 26, 0.09);
+    transform: perspective(900px) rotateX(3deg) rotateY(-5deg);
+  }
+
+  .pipeline-step span {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    color: white;
+    background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
+    font-weight: 1000;
+    box-shadow: 0 12px 24px rgba(225, 48, 108, 0.24);
+  }
+
+  .pipeline-step strong {
+    display: block;
+    font-size: 16px;
+    line-height: 1.15;
+  }
+
+  .pipeline-step small {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-weight: 750;
+    line-height: 1.35;
+  }
+
+  .cube-scene {
+    min-height: 318px;
+    display: grid;
+    place-items: center;
+    position: relative;
+    perspective: 900px;
+  }
+
+  .cube-title {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 1000;
+  }
+
+  .cube-legend {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 4px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .cube-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 9px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.88);
+    font-size: 11px;
+    font-weight: 1000;
+    box-shadow: 0 12px 24px rgba(21, 21, 26, 0.08);
+  }
+
+  .cube-legend i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--blue);
+  }
+
+  .cube-legend span:last-child i {
+    background: var(--hot);
+  }
+
+  .cube-box {
+    position: relative;
+    width: min(280px, 84vw);
+    height: 230px;
+    transform-style: preserve-3d;
+    transform: rotateX(60deg) rotateZ(-38deg);
+    animation: cubeDrift 4.5s ease-in-out infinite alternate;
+  }
+
+  .cube-face {
+    position: absolute;
+    border: 1px solid rgba(24, 24, 27, 0.12);
+    background: rgba(255, 255, 255, 0.36);
+    box-shadow: inset 0 0 32px rgba(64, 93, 230, 0.08);
+  }
+
+  .cube-floor {
+    inset: 38px 20px 20px;
+    border-radius: 20px;
+  }
+
+  .cube-back {
+    left: 20px;
+    top: 18px;
+    width: calc(100% - 40px);
+    height: 112px;
+    transform: rotateX(72deg) translateY(-86px);
+    transform-origin: top;
+    border-radius: 18px;
+  }
+
+  .cube-side {
+    right: 20px;
+    top: 38px;
+    width: 112px;
+    height: calc(100% - 58px);
+    transform: rotateY(72deg) translateX(86px);
+    transform-origin: right;
+    border-radius: 18px;
+  }
+
+  .decision-sheet {
+    position: absolute;
+    left: 92px;
+    top: 44px;
+    width: 106px;
+    height: 150px;
+    border: 2px solid rgba(225, 48, 108, 0.56);
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(225, 48, 108, 0.18), rgba(252, 175, 69, 0.08));
+    transform: rotateY(65deg) rotateZ(6deg);
+    box-shadow: 0 18px 38px rgba(225, 48, 108, 0.12);
+  }
+
+  .cube-point {
+    position: absolute;
+    z-index: 3;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--blue);
+    box-shadow: 0 0 0 5px rgba(64, 93, 230, 0.14), 0 16px 18px rgba(21, 21, 26, 0.18);
+  }
+
+  .cube-point.hot {
+    background: var(--hot);
+    box-shadow: 0 0 0 5px rgba(225, 48, 108, 0.14), 0 16px 18px rgba(21, 21, 26, 0.18);
+  }
+
+  .cube-point.synthetic {
+    background: #22c55e;
+    box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.16), 0 16px 18px rgba(21, 21, 26, 0.18);
+  }
+
   .algo-card {
     min-height: 316px;
     overflow: hidden;
@@ -574,6 +926,20 @@ STYLE = """
     border-left: 2px solid rgba(24,24,27,.16);
     border-bottom: 2px solid rgba(24,24,27,.16);
     pointer-events: none;
+  }
+
+  .logistic-svg {
+    position: absolute;
+    inset: 8px;
+    width: calc(100% - 16px);
+    height: calc(100% - 16px);
+    z-index: 1;
+  }
+
+  .logistic-svg text {
+    font-family: inherit;
+    font-weight: 900;
+    fill: var(--muted);
   }
 
   .viz-chip {
@@ -785,29 +1151,76 @@ STYLE = """
     margin-bottom: 0;
   }
 
+  .table-wrapper {
+    margin-top: 12px;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.72);
+  }
+
   .metric-table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0 8px;
-    margin-top: 12px;
+    table-layout: fixed;
+    border-collapse: collapse;
     color: var(--muted);
-    font-size: 13px;
+    font-size: clamp(10px, 1.7vw, 13px);
     text-align: left;
   }
 
   .metric-table th, .metric-table td {
-    padding: 8px 10px;
-    background: rgba(244, 244, 245, 0.76);
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
   }
 
-  .metric-table th:first-child, .metric-table td:first-child {
-    border-radius: 12px 0 0 12px;
+  .metric-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .metric-table th {
+    background: rgba(255, 255, 255, 0.78);
     font-weight: 900;
     color: var(--ink);
+    padding: 14px 10px;
+    white-space: nowrap;
   }
 
-  .metric-table th:last-child, .metric-table td:last-child {
-    border-radius: 0 12px 12px 0;
+  .metric-table abbr {
+    text-decoration: none;
+    cursor: help;
+  }
+
+  .metric-table td:first-child {
+    font-weight: 600;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .metric-table th:not(:first-child),
+  .metric-table td:not(:first-child) {
+    text-align: center;
+  }
+
+  .metric-table col:first-child {
+    width: 42%;
+  }
+
+  .metric-table col:not(:first-child) {
+    width: 14.5%;
+  }
+
+  @media (max-width: 640px) {
+    .metric-table th, .metric-table td {
+      padding: 10px 6px;
+    }
+
+    .metric-table {
+      font-size: 10px;
+    }
   }
 
   @keyframes pageIn {
@@ -840,8 +1253,15 @@ STYLE = """
     to { width: var(--score); }
   }
 
+  @keyframes cubeDrift {
+    from { transform: rotateX(60deg) rotateZ(-38deg) translate3d(-2px, 0, 0); }
+    to { transform: rotateX(57deg) rotateZ(-34deg) translate3d(8px, -4px, 0); }
+  }
+
   @media (max-width: 920px) {
-    .hero, .predict-layout, .section-grid, .algorithm-lab, .advice-grid { grid-template-columns: 1fr; }
+    .hero, .predict-layout, .section-grid, .algorithm-lab, .advice-grid, .research-map, .producer-grid { grid-template-columns: 1fr; }
+    .producer-heading { display: block; }
+    .producer-heading p { margin-top: 10px; }
     .profile { position: static; }
   }
 
@@ -867,7 +1287,7 @@ STYLE = """
 
 class ObesityInput(BaseModel):
     age: int = Field(..., ge=5, le=100)
-    sex: str = Field(..., examples=["M", "F"])
+    sex: Literal["M", "F"] = Field(..., examples=["M", "F"])
     height_cm: float = Field(..., ge=80, le=230)
     weight_kg: float = Field(..., ge=20, le=250)
     physical_activity_hours_per_week: float = Field(..., ge=0, le=40)
@@ -906,6 +1326,26 @@ def page_shell(title: str, body: str) -> str:
     """
 
 
+def prediction_error_html(message: str) -> str:
+    body = f"""
+    <section class="card result-card">
+      <div class="pill">Check your inputs</div>
+      <h1 style="font-size:38px">Input Error</h1>
+      <p class="note">{escape(message)}</p>
+      <div class="actions" style="justify-content:center">
+        <a class="button" href="/predictor">Back to predictor</a>
+      </div>
+    </section>
+    """
+    return page_shell("Input Error - O-Beast", body)
+
+
+def validate_form_input(input_data: dict) -> None:
+    import pandas as pd
+
+    validate_prediction_frame(pd.DataFrame([input_data]))
+
+
 def methods_html() -> str:
     methods = "".join(
         f'<div class="method"><strong>{name}</strong><span>{body}</span></div>'
@@ -914,22 +1354,92 @@ def methods_html() -> str:
     return f'<div class="method-grid">{methods}</div>'
 
 
+def research_visual_html() -> str:
+    return """
+    <div class="research-map">
+      <div class="pipeline-stack">
+        <div class="pipeline-step">
+          <span>1</span>
+          <div>
+            <strong>Your answers become dots</strong>
+            <small>Body, food, activity, sleep, and family history are placed in a simple learning space.</small>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <span>2</span>
+          <div>
+            <strong>The app looks for groups</strong>
+            <small>Similar dots gather together, helping O-Beast notice lower-risk and higher-risk patterns.</small>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <span>3</span>
+          <div>
+            <strong>Algorithms try a dividing wall</strong>
+            <small>Each method tries its own way to separate the groups and make a better guess.</small>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <span>4</span>
+          <div>
+            <strong>You get a clear result</strong>
+            <small>O-Beast turns the pattern into a probability, a risk band, and practical wellness advice.</small>
+          </div>
+        </div>
+      </div>
+      <div class="cube-scene" aria-label="3D pattern view showing example groups and a dividing wall">
+        <div class="cube-title">3D pattern view</div>
+        <div class="cube-box">
+          <span class="cube-face cube-floor"></span>
+          <span class="cube-face cube-back"></span>
+          <span class="cube-face cube-side"></span>
+          <span class="decision-sheet"></span>
+          <span class="cube-point" style="left:48px; top:154px"></span>
+          <span class="cube-point" style="left:72px; top:130px"></span>
+          <span class="cube-point" style="left:98px; top:168px"></span>
+          <span class="cube-point" style="left:122px; top:138px"></span>
+          <span class="cube-point" style="left:136px; top:116px"></span>
+          <span class="cube-point hot" style="left:176px; top:86px"></span>
+          <span class="cube-point hot" style="left:204px; top:62px"></span>
+          <span class="cube-point hot" style="left:226px; top:102px"></span>
+        </div>
+        <div class="cube-legend">
+          <span><i></i>lower pattern</span>
+          <span><i></i>higher pattern</span>
+        </div>
+      </div>
+    </div>
+    """
+
+
 
 def algorithm_visual_html() -> str:
     cards = [
         (
             "Logistic Regression",
-            "One smooth equation turns the answers into a probability.",
+            "Makes an S-curve, so the predicted probability stays between 0 and 1.",
             """
             <div class="algo-visual">
-              <span class="viz-chip" style="left:18px; bottom:18px">lower BMI</span>
-              <span class="viz-chip hot" style="right:16px; top:16px">higher risk</span>
-              <span class="dot" style="left:27%; top:66%"></span><span class="dot" style="left:38%; top:55%"></span>
-              <span class="dot alt" style="left:66%; top:30%"></span><span class="dot alt" style="left:78%; top:36%"></span>
-              <span class="line-viz"></span>
+              <svg class="logistic-svg" viewBox="0 0 300 140" aria-label="Logistic regression S-curve">
+                <line x1="42" y1="16" x2="42" y2="116" stroke="#18181b" stroke-width="3" stroke-linecap="round"/>
+                <line x1="42" y1="116" x2="280" y2="116" stroke="#18181b" stroke-width="3" stroke-linecap="round"/>
+                <line x1="42" y1="30" x2="270" y2="30" stroke="#8a8a95" stroke-width="2" stroke-dasharray="6 6"/>
+                <text x="10" y="34" font-size="14">y=1</text>
+                <text x="10" y="120" font-size="14">y=0</text>
+                <text x="112" y="135" font-size="13">input score</text>
+                <text x="88" y="22" font-size="14" fill="#c2410c">S-curve</text>
+                <path d="M55 112 C105 112 127 105 141 74 C154 42 172 30 255 28" fill="none" stroke="#e1306c" stroke-width="4" stroke-linecap="round"/>
+                <circle cx="54" cy="116" r="5" fill="#12a8c7"/><circle cx="72" cy="116" r="5" fill="#12a8c7"/>
+                <circle cx="90" cy="116" r="5" fill="#12a8c7"/><circle cx="108" cy="116" r="5" fill="#12a8c7"/>
+                <circle cx="186" cy="30" r="5" fill="#12a8c7"/><circle cx="204" cy="30" r="5" fill="#12a8c7"/>
+                <circle cx="222" cy="30" r="5" fill="#12a8c7"/><circle cx="240" cy="30" r="5" fill="#12a8c7"/>
+                <circle cx="260" cy="28" r="6" fill="#ef4444"/>
+                <text x="176" y="72" font-size="12">probability stays</text>
+                <text x="176" y="87" font-size="12">inside 0 to 1</text>
+              </svg>
             </div>
             """,
-            ["Takes weighted survey answers", "Draws one probability boundary", "Easy for professor to explain"],
+            ["Combines answers into one score", "S-curve converts score to probability", "Output cannot go below 0 or above 1"],
         ),
         (
             "Support Vector Machine",
@@ -1066,8 +1576,13 @@ def best_model_reason(result: dict) -> str:
     ranked = _ranked_metrics(metrics)
     best_metrics = metrics[best_name]
     runner_name = ranked[1][0] if len(ranked) > 1 else None
+    import math
     brier = best_metrics.get("brier_score")
-    brier_text = f" with a Brier score of {brier:.4f}" if isinstance(brier, (int, float)) else ""
+    brier_text = (
+        f" with a Brier score of {brier:.4f}"
+        if isinstance(brier, (int, float)) and not math.isnan(brier)
+        else ""
+    )
     if runner_name:
         return (
             f"{best_name} is selected for the current training data because the tournament sorts models by "
@@ -1109,10 +1624,15 @@ def metric_table_html(metrics: dict) -> str:
             "</tr>"
         )
     return (
+        '<div class="table-wrapper">'
         '<table class="metric-table">'
-        "<thead><tr><th>Model</th><th>Accuracy</th><th>Kappa</th><th>Sensitivity</th><th>Specificity</th></tr></thead>"
+        "<colgroup><col><col><col><col><col></colgroup>"
+        "<thead><tr><th>Model</th><th>Accuracy</th><th>Kappa</th>"
+        '<th><abbr title="Sensitivity">Sens.</abbr></th>'
+        '<th><abbr title="Specificity">Spec.</abbr></th></tr></thead>'
         f"<tbody>{''.join(rows)}</tbody>"
         "</table>"
+        "</div>"
     )
 
 
@@ -1147,10 +1667,50 @@ def hidden_inputs_html(input_data: dict) -> str:
     )
 
 
+def producer_section_html() -> str:
+    cards = []
+    for producer in PRODUCER_PROFILES:
+        contact_links = "".join(
+            f'<a class="contact-link" href="{escape(url, quote=True)}" target="_blank" rel="noreferrer">{escape(label)}</a>'
+            for label, url in producer["contacts"]
+        )
+        if not contact_links:
+            contact_links = '<span class="contact-slot">Contact link coming soon</span>'
+        cards.append(
+            f"""
+            <article class="producer-card">
+              <div class="producer-photo-wrap">
+                <img class="producer-photo {escape(producer["photo_class"], quote=True)}" src="{escape(producer["image"], quote=True)}" alt="Portrait of {escape(producer["name"], quote=True)}">
+              </div>
+              <div class="producer-body">
+                <h3>{escape(producer["name"])}</h3>
+                <p>Producer</p>
+                <div class="contact-row" aria-label="Contact links for {escape(producer["name"], quote=True)}">
+                  {contact_links}
+                </div>
+              </div>
+            </article>
+            """
+        )
+    return f"""
+    <section class="producers-section" aria-labelledby="producer-heading">
+      <div class="producer-heading">
+        <div>
+          <div class="kicker">Know About Producers</div>
+          <h2 id="producer-heading">Meet the O-Beast Team</h2>
+        </div>
+        <p>The students behind this research app.</p>
+      </div>
+      <div class="producer-grid">{''.join(cards)}</div>
+    </section>
+    """
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
-    producer_cards = "".join(f"<div class='method'><strong>{name}</strong><span>Producer</span></div>" for name in PRODUCERS)
+    research_visual = research_visual_html()
     algorithm_cards = algorithm_visual_html()
+    producers = producer_section_html()
     body = f"""
     <section class="hero">
       <div class="hero-copy">
@@ -1176,25 +1736,22 @@ def home() -> str:
         </div>
         <div class="story"><div class="story-icon">A</div><div><strong>Activity</strong><span>exercise and screen habits</span></div></div>
         <div class="story"><div class="story-icon">F</div><div><strong>Food</strong><span>fast food and sugary drinks</span></div></div>
-        <div class="story"><div class="story-icon">M</div><div><strong>Model</strong><span>best algorithm chosen by metrics</span></div></div>
+        <div class="story"><div class="story-icon">P</div><div><strong>Pattern</strong><span>answers become an easy result</span></div></div>
       </div>
     </section>
 
     <section class="card" style="margin-top:18px">
-      <div class="kicker">Algorithm visualization</div>
-      <h1 style="font-size:44px">How Each Algorithm Learns</h1>
-      <p class="lead">Each method studies the same student profile answers, makes a probability guess, checks training mistakes, and improves in its own style.</p>
+      <div class="kicker">3D learning visual</div>
+      <h1 style="font-size:44px">How O-Beast Finds Patterns</h1>
+      <p class="lead">O-Beast turns answers into dots, lets several algorithms look for patterns, and changes the final pattern into an easy probability result.</p>
+      {research_visual}
       {algorithm_cards}
     </section>
 
-    <section class="section-grid">
-      <div class="card">
-        <h2>Producer Credits</h2>
-        <div class="method-grid">{producer_cards}</div>
-      </div>
+    <section class="section-grid support-grid">
       <div class="card">
         <h2>Research Goal</h2>
-        <p>Build a school research tool that can learn from your survey data and estimate obesity-risk probability responsibly.</p>
+        <p>Build a school research tool that learns from student survey answers and estimates obesity-risk probability responsibly.</p>
       </div>
       <div class="card">
         <h2>Wellness Advice</h2>
@@ -1202,6 +1759,7 @@ def home() -> str:
         <a class="button secondary" href="/advice">See advice model</a>
       </div>
     </section>
+    {producers}
     """
     return page_shell("SK Obesity ML Research", body)
 
@@ -1268,13 +1826,12 @@ def methods() -> str:
 
     body = f"""
     <section class="card">
-      <div class="kicker">Model strategy</div>
-      <h1>Methods We Use</h1>
+      <div class="kicker">Model check</div>
+      <h1>How O-Beast Checks Results</h1>
       <p class="lead">
-        The pipeline follows the direction of your Notion references: compare logistic regression with
-        modern machine-learning models, balance data when classes are uneven, and keep the winning
-        method visible for research transparency. It also follows the E3S obesity ML comparison style by
-        reporting Accuracy, Kappa, Sensitivity, and Specificity in addition to probability metrics.
+        O-Beast compares several learning methods, checks how well each one performs, and shows
+        which method produced the current result. The scores are included to make the prediction
+        easier to understand, not to claim medical certainty.
       </p>
       {methods_html()}
     </section>
@@ -1287,7 +1844,7 @@ def methods() -> str:
       <div class="card"><h2>Balancing strategy</h2><p>{resampling_strategy}</p></div>
       <div class="card"><h2>Dataset note</h2><p>{dataset_warning or "Ready for real dataset."}</p></div>
       <div class="card"><h2>Risk tiers</h2><p>Output now uses five probability tiers: very low, low, moderate, high, and very high.</p></div>
-      <div class="card"><h2>Form import</h2><p>The code can normalize both Google Form schemas and mark missing cross-form questions before later training.</p></div>
+      <div class="card"><h2>Survey data support</h2><p>O-Beast can prepare answers from more than one survey format before later training.</p></div>
     </section>
     """
     return page_shell("Methods - SK Obesity ML", body)
@@ -1362,7 +1919,11 @@ def advice_from_form(
         "sugary_drinks_per_day": sugary_drinks_per_day,
         "family_history_obesity": family_history_obesity,
     }
-    result = predict_probability(input_data)
+    try:
+        validate_form_input(input_data)
+        result = predict_probability(input_data)
+    except ValueError as exc:
+        return HTMLResponse(prediction_error_html(str(exc)), status_code=400)
     advice = generate_advice(input_data, result)
     percent = round(result["obesity_probability"] * 100, 1)
     body = f"""
@@ -1414,7 +1975,11 @@ def predict_form(
         "sugary_drinks_per_day": sugary_drinks_per_day,
         "family_history_obesity": family_history_obesity,
     }
-    result = predict_probability(input_data)
+    try:
+        validate_form_input(input_data)
+        result = predict_probability(input_data)
+    except ValueError as exc:
+        return HTMLResponse(prediction_error_html(str(exc)), status_code=400)
     percent = round(result["obesity_probability"] * 100, 1)
     reason = best_model_reason(result)
     metric_bars = metric_bars_html(result.get("metrics", {}))
@@ -1435,7 +2000,7 @@ def predict_form(
       </div>
       <div class="reason-box" style="margin-top:14px">
         <h2>Model tournament scores</h2>
-        <p>These bars use cross-validation ROC-AUC on the current training data. The table also reports Accuracy, Kappa, Sensitivity, and Specificity like the reference paper.</p>
+        <p>These scores show how the learning methods compared during testing. They help explain the prototype result and should not be read as medical proof.</p>
         {metric_bars}
         {metric_table}
       </div>

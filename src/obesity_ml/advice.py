@@ -265,17 +265,6 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
         }
     )
 
-    if not cards:
-        cards.append(
-            {
-                "title": "Maintain your current healthy pattern",
-                "priority": "Maintenance",
-                "why": "Your answers do not show a major lifestyle warning in this prototype rule set.",
-                "action": "Keep regular activity, enough sleep, balanced meals, and low sugary-drink intake.",
-                "source": "WHO, CDC, and Thai dietary guidance",
-            }
-        )
-
     return {
         "bmi": round(bmi, 1),
         "focus": _priority_for_probability(probability),

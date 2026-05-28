@@ -84,6 +84,25 @@ def can_use_smote(y_train: pd.Series) -> bool:
     return SMOTENC is not None and y_train.nunique() == 2 and y_train.value_counts().min() >= 3
 
 
+def _clamp_smotenc_k_neighbors(pipeline, y: pd.Series) -> None:
+    """Tighten SMOTENC k_neighbors to the actual minority count of y.
+
+    make_pipeline sets k_neighbors from y_train, but model.fit() receives
+    y_fit (~80% of y_train after the calibration split). With very small
+    datasets the minority count in y_fit can be exactly k_neighbors+1 — the
+    bare minimum SMOTENC requires. Clamping to minority-1 adds one unit of
+    safety margin and prevents a ValueError at fit time.
+    """
+    if SMOTENC is None or not hasattr(pipeline, "steps"):
+        return
+    for _, step in pipeline.steps:
+        if isinstance(step, SMOTENC):
+            if y.nunique() == 2 and len(y) > 0:
+                minority = int(y.value_counts().min())
+                step.k_neighbors = max(1, min(step.k_neighbors, minority - 1))
+            return
+
+
 def make_pipeline(model, y_train: pd.Series) -> Pipeline:
     steps = []
     if can_use_smote(y_train):
@@ -263,11 +282,14 @@ def train(data_path: Path, model_path: Path = MODEL_PATH) -> dict[str, object]:
         stratify=stratify,
     )
 
+    # Calibration split is deterministic (fixed random_state + stratify), so compute once.
+    x_fit, x_calibration, y_fit, y_calibration = split_training_and_calibration(x_train, y_train)
+
     validation_results = {}
     trained_models = {}
     for name, model in candidate_models(y_train).items():
         validation_results[name] = cross_validated_metrics(model, x_train, y_train)
-        x_fit, x_calibration, y_fit, y_calibration = split_training_and_calibration(x_train, y_train)
+        _clamp_smotenc_k_neighbors(model, y_fit)
         model.fit(x_fit, y_fit)
         if x_calibration is not None and y_calibration is not None:
             model = CalibratedClassifierCV(FrozenEstimator(model), method="sigmoid")

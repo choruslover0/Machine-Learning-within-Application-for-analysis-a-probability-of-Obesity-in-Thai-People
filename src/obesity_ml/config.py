@@ -1,7 +1,19 @@
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+def _project_root() -> Path:
+    working_directory = Path.cwd()
+    if (working_directory / "models").exists() or (working_directory / "pyproject.toml").exists():
+        return working_directory
+
+    source_project_root = Path(__file__).resolve().parents[2]
+    if (source_project_root / "pyproject.toml").exists():
+        return source_project_root
+
+    return working_directory
+
+
+PROJECT_ROOT = _project_root()
 MODEL_DIR = PROJECT_ROOT / "models"
 MODEL_PATH = MODEL_DIR / "obesity_probability_model.joblib"
 
