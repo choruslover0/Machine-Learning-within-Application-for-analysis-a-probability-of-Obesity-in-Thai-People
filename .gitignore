@@ -4,6 +4,7 @@ __pycache__/
 .DS_Store
 models/*
 !models/obesity_probability_model.joblib
+!models/chatbot_model.joblib
 data/raw/
 data/processed/
 *.egg-info/

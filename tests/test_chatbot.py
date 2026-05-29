@@ -1,6 +1,7 @@
 import sys
 import unittest
 import json
+import tempfile
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -8,7 +9,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
 from obesity_ml.config import CHATBOT_MODEL_PATH
-from obesity_ml.chatbot import get_answer
+from obesity_ml.chatbot import get_answer, train_chatbot
 
 
 class ChatbotConfigTests(unittest.TestCase):
@@ -69,3 +70,18 @@ class ChatbotGetAnswerTests(unittest.TestCase):
     def test_get_answer_unknown_lang_defaults_to_en(self):
         result = get_answer("bmi", "fr")
         self.assertGreater(len(result["answer"]), 10)
+
+
+class ChatbotTrainTests(unittest.TestCase):
+    def test_train_chatbot_creates_model_file(self):
+        data_path = PROJECT_ROOT / "data" / "chatbot_training.json"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_path = Path(tmpdir) / "chatbot_model.joblib"
+            result = train_chatbot(data_path, out_path)
+            self.assertTrue(out_path.exists())
+            self.assertGreater(result["cv_mean"], 0.5)
+            self.assertEqual(
+                set(result["classes"]),
+                {"greeting", "causes", "prevention", "treatment",
+                 "diet", "exercise", "sleep", "bmi", "genetics", "risk_factors"},
+            )

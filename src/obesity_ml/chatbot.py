@@ -181,3 +181,40 @@ def get_answer(intent: str, lang: str, context: Optional[dict] = None) -> dict:
             answer = prefix.format(prob=prob_pct) + answer
 
     return {"answer": answer, "source": source}
+
+
+def train_chatbot(data_path: Path, model_path: Path) -> dict:
+    rows = json.loads(Path(data_path).read_text(encoding="utf-8"))
+    texts = [r["text"] for r in rows]
+    labels = [r["intent"] for r in rows]
+
+    pipeline = Pipeline([
+        (
+            "tfidf",
+            TfidfVectorizer(
+                analyzer="char_wb",
+                ngram_range=(2, 4),
+                sublinear_tf=True,
+                min_df=1,
+            ),
+        ),
+        ("clf", LogisticRegression(C=1.0, max_iter=1000)),
+    ])
+
+    scores = cross_val_score(pipeline, texts, labels, cv=5, scoring="accuracy")
+    pipeline.fit(texts, labels)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(pipeline, model_path)
+
+    return {
+        "cv_mean": float(scores.mean()),
+        "cv_std": float(scores.std()),
+        "classes": list(pipeline.classes_),
+    }
+
+
+def train_chatbot_cli() -> None:
+    result = train_chatbot(TRAINING_DATA_PATH, CHATBOT_MODEL_PATH)
+    print(f"Trained. CV accuracy: {result['cv_mean']:.3f} ± {result['cv_std']:.3f}")
+    print(f"Classes: {result['classes']}")
+    print(f"Model saved to {CHATBOT_MODEL_PATH}")

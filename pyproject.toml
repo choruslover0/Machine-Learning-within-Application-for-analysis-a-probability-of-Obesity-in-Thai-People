@@ -25,3 +25,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 obesity_ml = ["static/*"]
+
+[project.scripts]
+obesity_ml-train-chat = "obesity_ml.chatbot:train_chatbot_cli"
