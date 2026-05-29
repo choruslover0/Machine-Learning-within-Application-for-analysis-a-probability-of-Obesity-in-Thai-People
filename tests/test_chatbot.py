@@ -8,6 +8,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
 from obesity_ml.config import CHATBOT_MODEL_PATH
+from obesity_ml.chatbot import get_answer
 
 
 class ChatbotConfigTests(unittest.TestCase):
@@ -38,3 +39,33 @@ class ChatbotTrainingDataTests(unittest.TestCase):
         }
         found = {r["intent"] for r in self.rows}
         self.assertEqual(found, expected)
+
+
+class ChatbotGetAnswerTests(unittest.TestCase):
+    def test_get_answer_returns_required_keys(self):
+        result = get_answer("causes", "en")
+        self.assertIn("answer", result)
+        self.assertIn("source", result)
+
+    def test_get_answer_en_causes_has_content(self):
+        result = get_answer("causes", "en")
+        self.assertGreater(len(result["answer"]), 30)
+        self.assertTrue("WHO" in result["source"] or "CDC" in result["source"])
+
+    def test_get_answer_th_diet_has_content(self):
+        result = get_answer("diet", "th")
+        self.assertGreater(len(result["answer"]), 10)
+
+    def test_get_answer_treatment_with_very_high_context(self):
+        ctx = {"risk_tier": "Very High Risk", "probability": 0.72}
+        result = get_answer("treatment", "en", context=ctx)
+        self.assertTrue("72" in result["answer"] or "Very High" in result["answer"])
+
+    def test_get_answer_prevention_with_low_context(self):
+        ctx = {"risk_tier": "Low Risk", "probability": 0.20}
+        result = get_answer("prevention", "th", context=ctx)
+        self.assertGreater(len(result["answer"]), 10)
+
+    def test_get_answer_unknown_lang_defaults_to_en(self):
+        result = get_answer("bmi", "fr")
+        self.assertGreater(len(result["answer"]), 10)
