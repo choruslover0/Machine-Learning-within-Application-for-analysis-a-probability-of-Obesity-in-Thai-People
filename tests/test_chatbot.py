@@ -167,3 +167,19 @@ class ChatbotWidgetTests(unittest.TestCase):
         for path in ("/", "/predictor", "/advice", "/methods"):
             resp = self.client.get(path)
             self.assertIn('id="beast-fab"', resp.text, msg=f"Widget missing on {path}")
+
+
+class ChatbotResultContextTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(fastapi_app)
+
+    def test_result_page_has_risk_tier_data_attribute(self):
+        resp = self.client.post("/predict-form", data={
+            "age": "16", "sex": "M", "height_cm": "170", "weight_kg": "90",
+            "physical_activity_hours_per_week": "1", "screen_time_hours_per_day": "8",
+            "sleep_hours": "5", "fast_food_meals_per_week": "5",
+            "sugary_drinks_per_day": "3", "family_history_obesity": "1",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('data-risk-tier=', resp.text)
+        self.assertIn('data-probability=', resp.text)

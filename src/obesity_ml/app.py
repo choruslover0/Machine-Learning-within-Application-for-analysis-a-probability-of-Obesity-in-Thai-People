@@ -2170,4 +2170,11 @@ def predict_form(
       </div>
     </section>
     """
-    return page_shell("Result - SK Obesity ML", body)
+    return page_shell(
+        "Result - SK Obesity ML",
+        body,
+        chat_context={
+            "risk_tier": result["risk_tier_label"],
+            "probability": result["obesity_probability"],
+        },
+    )
