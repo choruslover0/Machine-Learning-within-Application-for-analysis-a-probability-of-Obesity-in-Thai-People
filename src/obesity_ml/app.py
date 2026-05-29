@@ -1,6 +1,6 @@
 from html import escape
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
@@ -1298,6 +1298,12 @@ class ObesityInput(BaseModel):
     family_history_obesity: int = Field(..., ge=0, le=1)
 
 
+class ChatRequest(BaseModel):
+    message: str
+    lang: str = "auto"
+    context: Optional[dict] = None
+
+
 def page_shell(title: str, body: str) -> str:
     return f"""
     <!doctype html>
@@ -1892,6 +1898,12 @@ def predictor() -> str:
 @app.post("/predict")
 def predict_api(payload: ObesityInput) -> dict:
     return predict_probability(payload.model_dump())
+
+
+@app.post("/chat")
+def chat_endpoint(payload: ChatRequest) -> dict:
+    from obesity_ml.chatbot import chat
+    return chat(payload.message, payload.lang, payload.context)
 
 
 @app.post("/advice", response_class=HTMLResponse)

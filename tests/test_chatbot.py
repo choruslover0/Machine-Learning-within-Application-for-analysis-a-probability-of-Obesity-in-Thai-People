@@ -8,6 +8,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
+from fastapi.testclient import TestClient
+from obesity_ml.app import app as fastapi_app
 from obesity_ml.config import CHATBOT_MODEL_PATH
 from obesity_ml.chatbot import get_answer, train_chatbot, chat
 
@@ -118,3 +120,30 @@ class ChatbotChatTests(unittest.TestCase):
         result = chat("hello", lang="en")
         for key in ("answer", "intent", "detected_lang", "source"):
             self.assertIn(key, result)
+
+
+class ChatbotEndpointTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(fastapi_app)
+
+    def test_chat_endpoint_shape(self):
+        resp = self.client.post("/chat", json={"message": "What causes obesity?", "lang": "en"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for key in ("answer", "intent", "detected_lang", "source"):
+            self.assertIn(key, data)
+
+    def test_chat_endpoint_unknown_returns_200(self):
+        resp = self.client.post("/chat", json={"message": "xyzqqqabc999", "lang": "en"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["intent"], "unknown")
+
+    def test_chat_endpoint_with_context(self):
+        resp = self.client.post("/chat", json={
+            "message": "how to treat obesity",
+            "lang": "en",
+            "context": {"risk_tier": "High Risk", "probability": 0.55},
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["intent"], "treatment")
