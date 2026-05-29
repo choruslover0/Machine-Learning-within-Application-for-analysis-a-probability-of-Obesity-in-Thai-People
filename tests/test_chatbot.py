@@ -147,3 +147,23 @@ class ChatbotEndpointTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["intent"], "treatment")
+
+
+class ChatbotWidgetTests(unittest.TestCase):
+    def setUp(self):
+        # reuse the TestClient already imported
+        self.client = TestClient(fastapi_app)
+
+    def test_page_shell_contains_beast_fab(self):
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('id="beast-fab"', resp.text)
+
+    def test_page_shell_contains_chat_window(self):
+        resp = self.client.get("/")
+        self.assertIn('id="beast-chat"', resp.text)
+
+    def test_widget_shows_on_all_pages(self):
+        for path in ("/", "/predictor", "/advice", "/methods"):
+            resp = self.client.get(path)
+            self.assertIn('id="beast-fab"', resp.text, msg=f"Widget missing on {path}")
