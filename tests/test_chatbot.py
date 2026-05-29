@@ -9,7 +9,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
 from obesity_ml.config import CHATBOT_MODEL_PATH
-from obesity_ml.chatbot import get_answer, train_chatbot
+from obesity_ml.chatbot import get_answer, train_chatbot, chat
 
 
 class ChatbotConfigTests(unittest.TestCase):
@@ -85,3 +85,36 @@ class ChatbotTrainTests(unittest.TestCase):
                 {"greeting", "causes", "prevention", "treatment",
                  "diet", "exercise", "sleep", "bmi", "genetics", "risk_factors"},
             )
+
+
+class ChatbotChatTests(unittest.TestCase):
+    def test_chat_causes_en(self):
+        result = chat("What causes obesity?", lang="en")
+        self.assertEqual(result["intent"], "causes")
+        self.assertEqual(result["detected_lang"], "en")
+        self.assertGreater(len(result["answer"]), 20)
+
+    def test_chat_diet_th(self):
+        result = chat("ควรกินอะไร", lang="th")
+        self.assertEqual(result["intent"], "diet")
+        self.assertEqual(result["detected_lang"], "th")
+
+    def test_chat_bmi_auto_detect_en(self):
+        result = chat("What is BMI?", lang="auto")
+        self.assertEqual(result["intent"], "bmi")
+        self.assertEqual(result["detected_lang"], "en")
+
+    def test_chat_low_confidence_returns_unknown(self):
+        result = chat("xyzqqqabcdef999", lang="en")
+        self.assertEqual(result["intent"], "unknown")
+
+    def test_chat_with_context_treatment(self):
+        ctx = {"risk_tier": "Very High Risk", "probability": 0.78}
+        result = chat("How to treat obesity?", lang="en", context=ctx)
+        self.assertEqual(result["intent"], "treatment")
+        self.assertTrue("78" in result["answer"] or "Very High" in result["answer"])
+
+    def test_chat_response_has_all_keys(self):
+        result = chat("hello", lang="en")
+        for key in ("answer", "intent", "detected_lang", "source"):
+            self.assertIn(key, result)

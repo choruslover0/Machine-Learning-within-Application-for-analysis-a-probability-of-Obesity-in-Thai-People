@@ -183,6 +183,57 @@ def get_answer(intent: str, lang: str, context: Optional[dict] = None) -> dict:
     return {"answer": answer, "source": source}
 
 
+def _detect_language(text: str) -> str:
+    try:
+        from langdetect import detect
+        lang = detect(text)
+        return "th" if lang == "th" else "en"
+    except Exception:
+        return "en"
+
+
+def _classify_intent(text: str, model: Pipeline) -> tuple[str, float]:
+    proba = model.predict_proba([text])[0]
+    idx = int(np.argmax(proba))
+    return str(model.classes_[idx]), float(proba[idx])
+
+
+def chat(
+    message: str,
+    lang: str = "auto",
+    context: Optional[dict] = None,
+) -> dict:
+    detected_lang = _detect_language(message) if lang == "auto" else lang
+    if detected_lang not in ("en", "th"):
+        detected_lang = "en"
+
+    try:
+        model = load_chatbot()
+    except FileNotFoundError:
+        fallback = {
+            "en": "Beast 1.0 is not trained yet. Run `obesity_ml-train-chat` first.",
+            "th": "Beast 1.0 ยังไม่ได้รับการฝึก กรุณารัน `obesity_ml-train-chat` ก่อน",
+        }
+        return {"answer": fallback[detected_lang], "intent": "error", "detected_lang": detected_lang, "source": ""}
+
+    intent, confidence = _classify_intent(message, model)
+
+    if confidence < 0.20:
+        fallback = {
+            "en": "I'm not sure I understood that — try rephrasing, or tap a chip below.",
+            "th": "ฉันไม่แน่ใจว่าเข้าใจถูกต้อง — ลองพิมพ์ใหม่ หรือกดปุ่มด้านล่าง",
+        }
+        return {"answer": fallback[detected_lang], "intent": "unknown", "detected_lang": detected_lang, "source": ""}
+
+    result = get_answer(intent, detected_lang, context)
+    return {
+        "answer": result["answer"],
+        "intent": intent,
+        "detected_lang": detected_lang,
+        "source": result["source"],
+    }
+
+
 def train_chatbot(data_path: Path, model_path: Path) -> dict:
     rows = json.loads(Path(data_path).read_text(encoding="utf-8"))
     texts = [r["text"] for r in rows]
