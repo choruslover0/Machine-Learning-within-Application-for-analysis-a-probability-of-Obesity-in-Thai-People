@@ -91,7 +91,7 @@ When `context.risk_tier` is provided, the `treatment` and `prevention` answers p
 **Trigger button (closed state):**
 - Style: Rounded square, 68×68 px, border-radius 22px
 - Background: O-Beast gradient (violet → hot pink → sun)
-- Icon: 🦁 (28px), label "Beast 1.0" (10px, bold)
+- Icon: `/static/beast1-logo.png` image (44px, object-fit cover), no emoji fallback
 - On Result page only: green notification dot (badge) in top-right corner
 
 **Chat window (open state):**
