@@ -16,6 +16,7 @@ def _project_root() -> Path:
 PROJECT_ROOT = _project_root()
 MODEL_DIR = PROJECT_ROOT / "models"
 MODEL_PATH = MODEL_DIR / "obesity_probability_model.joblib"
+CHATBOT_MODEL_PATH = MODEL_DIR / "chatbot_model.joblib"
 
 TARGET_COLUMN = "obesity"
 
