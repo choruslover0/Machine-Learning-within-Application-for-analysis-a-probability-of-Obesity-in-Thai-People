@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b9098"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="8" dy="10" stdDeviation="0" flood-color="#eadfe7" flood-opacity="1"/>
+    </filter>
+    <style>
+      .bg { fill: #fffafc; }
+      .title { font: 700 64px Arial, Helvetica, sans-serif; fill: #111217; }
+      .subtitle { font: 400 30px Arial, Helvetica, sans-serif; fill: #626572; }
+      .box-title { font: 700 34px Arial, Helvetica, sans-serif; fill: #111217; }
+      .box-text { font: 400 25px Arial, Helvetica, sans-serif; fill: #60636f; }
+      .small-title { font: 700 24px Arial, Helvetica, sans-serif; fill: #111217; }
+      .small-text { font: 400 22px Arial, Helvetica, sans-serif; fill: #60636f; }
+      .footer { font: 400 23px Arial, Helvetica, sans-serif; fill: #60636f; }
+      .arrow-line { stroke: #9b9098; stroke-width: 7; fill: none; marker-end: url(#arrow); }
+      .chip { fill: #faf8fa; stroke-width: 3; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1800" height="1200"/>
+
+  <text x="90" y="118" class="title">Advice Logic Flowchart</text>
+  <text x="92" y="168" class="subtitle">How O-Beast turns user answers into personalized wellness advice</text>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="250" rx="28" ry="28" width="420" height="165" fill="#fff" stroke="#8b3fb3" stroke-width="4"/>
+    <path d="M118 250 H482 A28 28 0 0 1 510 278 V268 H90 V278 A28 28 0 0 1 118 250 Z" fill="#8b3fb3"/>
+    <text x="124" y="313" class="box-title">1. User answers</text>
+    <text x="124" y="363" class="box-text">Age, BMI inputs, activity, screen</text>
+    <text x="124" y="397" class="box-text">time, sleep, drinks, food habits,</text>
+    <text x="124" y="431" class="box-text">and family history</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="690" y="250" rx="28" ry="28" width="420" height="165" fill="#fff" stroke="#d93672" stroke-width="4"/>
+    <path d="M718 250 H1082 A28 28 0 0 1 1110 278 V268 H690 V278 A28 28 0 0 1 718 250 Z" fill="#d93672"/>
+    <text x="724" y="313" class="box-title">2. ML prediction</text>
+    <text x="724" y="363" class="box-text">The trained model outputs an</text>
+    <text x="724" y="397" class="box-text">obesity-risk probability as a</text>
+    <text x="724" y="431" class="box-text">percentage</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1290" y="250" rx="28" ry="28" width="420" height="165" fill="#fff" stroke="#f06d3f" stroke-width="4"/>
+    <path d="M1318 250 H1682 A28 28 0 0 1 1710 278 V268 H1290 V278 A28 28 0 0 1 1318 250 Z" fill="#f06d3f"/>
+    <text x="1324" y="313" class="box-title">3. Risk tier</text>
+    <text x="1324" y="363" class="box-text">Probability is grouped into</text>
+    <text x="1324" y="397" class="box-text">fine risk bands from low to</text>
+    <text x="1324" y="431" class="box-text">high</text>
+  </g>
+
+  <path class="arrow-line" d="M510 332 H690"/>
+  <path class="arrow-line" d="M1110 332 H1290"/>
+  <path class="arrow-line" d="M1500 415 V520 H300 V610"/>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="610" rx="28" ry="28" width="420" height="190" fill="#fff" stroke="#2f6fed" stroke-width="4"/>
+    <path d="M118 610 H482 A28 28 0 0 1 510 638 V628 H90 V638 A28 28 0 0 1 118 610 Z" fill="#2f6fed"/>
+    <text x="124" y="673" class="box-title">4. Habit checks</text>
+    <text x="124" y="723" class="box-text">Rule-based checks compare</text>
+    <text x="124" y="757" class="box-text">answers with health-guideline</text>
+    <text x="124" y="791" class="box-text">signals</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="690" y="610" rx="28" ry="28" width="420" height="190" fill="#fff" stroke="#168a63" stroke-width="4"/>
+    <path d="M718 610 H1082 A28 28 0 0 1 1110 638 V628 H690 V638 A28 28 0 0 1 718 610 Z" fill="#168a63"/>
+    <text x="724" y="673" class="box-title">5. Advice cards</text>
+    <text x="724" y="723" class="box-text">Each triggered rule creates a</text>
+    <text x="724" y="757" class="box-text">clear why, action, and source</text>
+    <text x="724" y="791" class="box-text">for the user</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1290" y="610" rx="28" ry="28" width="420" height="190" fill="#fff" stroke="#d93672" stroke-width="4"/>
+    <path d="M1318 610 H1682 A28 28 0 0 1 1710 638 V628 H1290 V638 A28 28 0 0 1 1318 610 Z" fill="#d93672"/>
+    <text x="1324" y="673" class="box-title">6. User output</text>
+    <text x="1324" y="723" class="box-text">The app shows probability,</text>
+    <text x="1324" y="757" class="box-text">risk band, and personalized</text>
+    <text x="1324" y="791" class="box-text">wellness advice</text>
+  </g>
+
+  <path class="arrow-line" d="M510 705 H690"/>
+  <path class="arrow-line" d="M1110 705 H1290"/>
+
+  <g filter="url(#shadow)">
+    <rect x="210" y="900" rx="32" ry="32" width="1380" height="210" fill="#fff" stroke="#f3bfd3" stroke-width="4"/>
+    <text x="246" y="962" class="box-title">Example logic used in the advice rules</text>
+
+    <rect x="254" y="1002" rx="22" ry="22" width="285" height="70" class="chip" stroke="#2f6fed"/>
+    <text x="272" y="1030" class="small-title">Low activity</text>
+    <text x="272" y="1058" class="small-text">-&gt; movement goal</text>
+
+    <rect x="584" y="1002" rx="22" ry="22" width="285" height="70" class="chip" stroke="#8b3fb3"/>
+    <text x="602" y="1030" class="small-title">Short sleep</text>
+    <text x="602" y="1058" class="small-text">-&gt; sleep routine</text>
+
+    <rect x="914" y="1002" rx="22" ry="22" width="285" height="70" class="chip" stroke="#f06d3f"/>
+    <text x="932" y="1030" class="small-title">Sugary drinks</text>
+    <text x="932" y="1058" class="small-text">-&gt; reduce step by step</text>
+
+    <rect x="1244" y="1002" rx="22" ry="22" width="285" height="70" class="chip" stroke="#d93672"/>
+    <text x="1262" y="1030" class="small-title">High risk tier</text>
+    <text x="1262" y="1058" class="small-text">-&gt; stronger priority</text>
+  </g>
+
+  <text x="90" y="1150" class="footer">Educational wellness guidance only. It does not replace medical diagnosis or professional care.</text>
+</svg>

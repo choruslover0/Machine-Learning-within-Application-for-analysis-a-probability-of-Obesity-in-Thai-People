@@ -7,3 +7,4 @@ models/*
 data/raw/
 data/processed/
 *.egg-info/
+.superpowers/
