@@ -1286,6 +1286,12 @@ STYLE = """
 
 CHAT_WIDGET_STYLE = """
 <style>
+  /* Neutralise the global `button {}` rule (min-height:52px, margin-top:18px,
+     box-shadow) that would otherwise stretch the chat widget buttons into tall
+     ovals. Width is left to each button's own class. */
+  .beast-fab, .beast-chat button, .beast-notify button {
+    min-height: 0; margin-top: 0; box-shadow: none;
+  }
   .beast-fab {
     position: fixed; bottom: 20px; right: 20px; z-index: 1000;
     width: 72px; height: 72px; border-radius: 22px;
@@ -1341,9 +1347,9 @@ CHAT_WIDGET_STYLE = """
   .beast-head-img { width: 36px; height: 36px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.18); flex-shrink: 0; }
   .beast-head-info strong { display: block; font-size: 14px; }
   .beast-head-info small { opacity: .82; font-size: 11px; }
-  .beast-lang-toggle { margin-left: auto; display: flex; gap: 4px; background: rgba(255,255,255,.20); border-radius: 999px; padding: 3px; }
-  .beast-lang-btn { padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 900; color: rgba(255,255,255,.75); border: 0; background: transparent; cursor: pointer; font-family: inherit; }
-  .beast-lang-btn.active { background: rgba(255,255,255,.30); color: white; }
+  .beast-lang-toggle { margin-left: auto; display: flex; gap: 3px; background: rgba(255,255,255,.18); border-radius: 999px; padding: 2px; flex-shrink: 0; }
+  .beast-lang-btn { width: auto; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 10px; font-weight: 900; color: rgba(255,255,255,.78); border: 0; background: transparent; cursor: pointer; font-family: inherit; line-height: 1; display: inline-flex; align-items: center; }
+  .beast-lang-btn.active { background: rgba(255,255,255,.32); color: white; }
   .beast-ctx { margin: 8px 12px 0; border-radius: 14px; padding: 8px 12px; background: rgba(225,48,108,.08); border: 1px solid rgba(225,48,108,.22); font-size: 11px; color: var(--hot); font-weight: 800; line-height: 1.4; }
   .beast-msgs { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; min-height: 80px; }
   .beast-msg { line-height: 1.4; max-width: 88%; }
@@ -1359,17 +1365,19 @@ CHAT_WIDGET_STYLE = """
   .beast-input:focus { box-shadow: 0 0 0 3px rgba(225,48,108,.16); background: #fff; }
   .beast-send { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; background: linear-gradient(135deg, var(--hot), var(--sun)); border: 0; color: white; font-size: 13px; cursor: pointer; display: grid; place-items: center; }
   .beast-notify {
-    position: fixed; bottom: 100px; right: 96px; z-index: 1001;
+    display: none;
+    position: fixed; bottom: 104px; right: 20px; z-index: 999;
     background: white; border: 1.5px solid rgba(225,48,108,.28);
     border-radius: 16px 16px 4px 16px;
     padding: 10px 12px 10px 14px; font-size: 12px; font-weight: 800; line-height: 1.45;
     color: var(--ink); box-shadow: 0 10px 28px rgba(21,21,26,.16);
-    max-width: 200px; display: flex; align-items: flex-start; gap: 8px;
+    max-width: 210px; align-items: flex-start; gap: 8px;
   }
+  .beast-notify.show { display: flex; }
   .beast-notify.pop { animation: notifyIn 380ms cubic-bezier(.34,1.56,.64,1) both; }
   .beast-notify-text { flex: 1; }
   .beast-notify-close {
-    flex-shrink: 0; background: none; border: 0; font-size: 13px;
+    width: auto; flex-shrink: 0; background: none; border: 0; font-size: 14px;
     color: var(--muted); cursor: pointer; padding: 0; line-height: 1;
     margin-top: -1px;
   }
@@ -1857,7 +1865,7 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
     <button type="submit" class="beast-send" aria-label="Send">&#x27A4;</button>
   </form>
 </div>
-<div id="beast-notify" class="beast-notify" hidden>
+<div id="beast-notify" class="beast-notify">
   <span class="beast-notify-text" id="beast-notify-text"></span>
   <button class="beast-notify-close" id="beast-notify-close" aria-label="Dismiss">&#x2715;</button>
 </div>
@@ -1879,22 +1887,22 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
   var shouldNotify=fab.dataset.notify==='1';
 
   function closeChat(){{ chat.classList.remove('open'); }}
-  function openChat(){{ chat.classList.add('open'); ntf.hidden=true; inp.focus(); }}
-  function dismissNotify(){{ ntf.hidden=true; }}
+  function openChat(){{ chat.classList.add('open'); dismissNotify(); inp.focus(); }}
+  function dismissNotify(){{ ntf.classList.remove('show'); }}
   function isChatOpen(){{ return chat.classList.contains('open'); }}
 
   /* Context banner */
   if(tier){{ctx.hidden=false;ctx.textContent='📊 Your result: '+tier+' ('+Math.round(parseFloat(prob)*100)+'%) — I will tailor my answers to your score.';}}
 
-  /* Notification + shake on Result / Advice pages */
+  /* Notification + shake on Result / Advice pages (only if chat not already open) */
   if(shouldNotify){{
     setTimeout(function(){{
+      if(isChatOpen())return;
       var l=(lang==='auto')?'en':lang;
       var msgs_en='If you want any extra answers, I am here 👋';
       var msgs_th='ถ้าอยากรู้เพิ่มเติม ถามฉันได้เลย 👋';
       ntfText.textContent=(l==='th')?msgs_th:msgs_en;
-      ntf.hidden=false;
-      ntf.classList.add('pop');
+      ntf.classList.add('show','pop');
       fab.classList.add('shake');
       fab.addEventListener('animationend',function(){{fab.classList.remove('shake');}},{{once:true}});
     }},1500);
