@@ -1330,8 +1330,10 @@ CHAT_WIDGET_STYLE = """
   .beast-bot { background: #f4f4f5; border-radius: 16px 16px 16px 4px; padding: 9px 12px; }
   .beast-user { background: linear-gradient(135deg, var(--violet), var(--hot)); color: white; border-radius: 16px 16px 4px 16px; padding: 9px 12px; align-self: flex-end; }
   .beast-src { display: block; margin-top: 4px; font-size: 10px; color: var(--muted); font-weight: 800; }
-  .beast-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 10px; }
-  .beast-chip { border: 1px solid rgba(225,48,108,.28); border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 900; color: var(--hot); background: rgba(225,48,108,.06); cursor: pointer; font-family: inherit; }
+  .beast-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 10px; transition: all 200ms ease; }
+  .beast-chip { border: 1px solid rgba(225,48,108,.28); border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 900; color: var(--hot); background: rgba(225,48,108,.06); cursor: pointer; font-family: inherit; transition: padding 200ms ease, font-size 200ms ease; }
+  .beast-chips.compact { gap: 4px; padding: 3px 12px 8px; }
+  .beast-chips.compact .beast-chip { padding: 3px 9px; font-size: 10px; }
   .beast-form { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
   .beast-input { flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; font-size: 12px; outline: none; background: #fafafa; font-family: inherit; }
   .beast-input:focus { box-shadow: 0 0 0 3px rgba(225,48,108,.16); background: #fff; }
@@ -1830,6 +1832,7 @@ def chat_widget_html(risk_tier: str = "", probability: str = "") -> str:
   form.addEventListener('submit',function(){{var t=inp.value.trim();if(!t)return;inp.value='';send(t);}});
   function send(text){{
     bubble(text,'user');
+    document.querySelector('.beast-chips').classList.add('compact');
     var body={{message:text,lang:lang}};
     if(tier)body.context={{risk_tier:tier,probability:parseFloat(prob)}};
     fetch('/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}})
