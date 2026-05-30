@@ -1294,16 +1294,33 @@ CHAT_WIDGET_STYLE = """
     gap: 3px; padding: 6px 6px 4px;
     box-shadow: 0 16px 36px rgba(225,48,108,.34);
     border: 0; cursor: pointer; color: white;
-    transition: transform 180ms ease, box-shadow 180ms ease;
+    transition: box-shadow 180ms ease;
   }
-  .beast-fab:hover { transform: translateY(-2px) scale(1.04); }
   .beast-fab img { width: 46px; height: 46px; object-fit: contain; border-radius: 8px; }
   .beast-fab-label { font-size: 9px; font-weight: 900; letter-spacing: .04em; font-family: inherit; }
   .beast-fab-badge {
     position: absolute; top: -4px; right: -4px;
-    width: 16px; height: 16px; border-radius: 50%;
-    background: #22c55e; border: 2px solid white; display: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--hot); border: 2px solid white; display: none;
   }
+  @keyframes beastShake {
+    0%,100% { transform: rotate(0deg) scale(1); }
+    15%      { transform: rotate(-10deg) scale(1.08); }
+    30%      { transform: rotate(10deg)  scale(1.08); }
+    45%      { transform: rotate(-7deg)  scale(1.04); }
+    60%      { transform: rotate(7deg)   scale(1.04); }
+    75%      { transform: rotate(-3deg)  scale(1.02); }
+    90%      { transform: rotate(3deg)   scale(1.02); }
+  }
+  .beast-fab.shake { animation: beastShake 0.9s ease-in-out; }
+  .beast-close {
+    margin-left: auto; background: rgba(255,255,255,.22); border: 0;
+    border-radius: 50%; width: 26px; height: 26px; color: white;
+    font-size: 14px; cursor: pointer; display: grid; place-items: center;
+    flex-shrink: 0; font-family: inherit; line-height: 1;
+    transition: background 150ms ease;
+  }
+  .beast-close:hover { background: rgba(255,255,255,.38); }
   .beast-chat {
     position: fixed; bottom: 104px; right: 16px; z-index: 1000;
     width: 310px; max-height: calc(100vh - 140px); border-radius: 26px;
@@ -1341,23 +1358,29 @@ CHAT_WIDGET_STYLE = """
   .beast-send { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; background: linear-gradient(135deg, var(--hot), var(--sun)); border: 0; color: white; font-size: 13px; cursor: pointer; display: grid; place-items: center; }
   .beast-notify {
     position: fixed; bottom: 100px; right: 96px; z-index: 1001;
-    background: white; border: 1.5px solid rgba(225,48,108,.30);
-    border-radius: 18px 18px 4px 18px;
-    padding: 10px 14px; font-size: 12px; font-weight: 800; line-height: 1.4;
+    background: white; border: 1.5px solid rgba(225,48,108,.28);
+    border-radius: 16px 16px 4px 16px;
+    padding: 10px 12px 10px 14px; font-size: 12px; font-weight: 800; line-height: 1.45;
     color: var(--ink); box-shadow: 0 10px 28px rgba(21,21,26,.16);
-    max-width: 210px; cursor: pointer;
-    animation: notifyIn 350ms cubic-bezier(.34,1.56,.64,1) both;
+    max-width: 200px; display: flex; align-items: flex-start; gap: 8px;
+  }
+  .beast-notify.pop { animation: notifyIn 380ms cubic-bezier(.34,1.56,.64,1) both; }
+  .beast-notify-text { flex: 1; }
+  .beast-notify-close {
+    flex-shrink: 0; background: none; border: 0; font-size: 13px;
+    color: var(--muted); cursor: pointer; padding: 0; line-height: 1;
+    margin-top: -1px;
   }
   .beast-notify::after {
-    content: ""; position: absolute; bottom: -8px; right: 18px;
-    width: 14px; height: 14px; background: white;
-    border-right: 1.5px solid rgba(225,48,108,.30);
-    border-bottom: 1.5px solid rgba(225,48,108,.30);
+    content: ""; position: absolute; bottom: -8px; right: 16px;
+    width: 13px; height: 13px; background: white;
+    border-right: 1.5px solid rgba(225,48,108,.28);
+    border-bottom: 1.5px solid rgba(225,48,108,.28);
     transform: rotate(45deg); clip-path: polygon(0 0, 100% 100%, 0 100%);
   }
   @keyframes notifyIn {
-    from {{ opacity: 0; transform: scale(.85) translateY(8px); }}
-    to   {{ opacity: 1; transform: scale(1)  translateY(0);    }}
+    from {{ opacity: 0; transform: scale(.82) translateY(10px); }}
+    to   {{ opacity: 1; transform: scale(1)   translateY(0);    }}
   }
 </style>
 """
@@ -1815,6 +1838,7 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
       <button class="beast-lang-btn active" data-lang="en">EN</button>
       <button class="beast-lang-btn" data-lang="th">TH</button>
     </div>
+    <button class="beast-close" id="beast-close-btn" aria-label="Close chat">&#x2715;</button>
   </div>
   <div id="beast-ctx" class="beast-ctx" hidden></div>
   <div id="beast-msgs" class="beast-msgs">
@@ -1832,9 +1856,9 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
   </form>
 </div>
 </div>
-<div id="beast-notify" class="beast-notify" hidden
-  data-en="🦁 Have questions about your result? Ask Beast 1.0!"
-  data-th="🦁 มีคำถามเกี่ยวกับผลลัพธ์ไหม? ถาม Beast 1.0 ได้เลย!">
+<div id="beast-notify" class="beast-notify" hidden>
+  <span class="beast-notify-text" id="beast-notify-text"></span>
+  <button class="beast-notify-close" id="beast-notify-close" aria-label="Dismiss">&#x2715;</button>
 </div>
 <script>
 (function(){{
@@ -1845,51 +1869,87 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
   var inp=document.getElementById(‘beast-input’);
   var ctx=document.getElementById(‘beast-ctx’);
   var ntf=document.getElementById(‘beast-notify’);
+  var ntfText=document.getElementById(‘beast-notify-text’);
+  var ntfClose=document.getElementById(‘beast-notify-close’);
+  var closeBtn=document.getElementById(‘beast-close-btn’);
   var lang=’auto’;
   var tier=fab.dataset.riskTier||’’;
   var prob=fab.dataset.probability||’’;
   var shouldNotify=fab.dataset.notify===’1’;
+
+  function closeChat(){{ chat.hidden=true; }}
+  function openChat(){{ chat.hidden=false; ntf.hidden=true; inp.focus(); }}
+  function dismissNotify(){{ ntf.hidden=true; }}
+
+  /* Context banner */
   if(tier){{ctx.hidden=false;ctx.textContent=’📊 Your result: ‘+tier+’ (‘+Math.round(parseFloat(prob)*100)+’%) — I\’ll tailor my answers to your score.’;}}
-  if(shouldNotify&&ntf){{
+
+  /* Notification + shake on Result / Advice pages */
+  if(shouldNotify){{
     setTimeout(function(){{
       var l=(lang===’auto’)?’en’:lang;
-      ntf.textContent=ntf.getAttribute(‘data-’+l)||ntf.getAttribute(‘data-en’);
+      var msgs_en=’If you want any extra answers I\’m here 👋’;
+      var msgs_th=’ถ้าอยากรู้เพิ่มเติม ถามฉันได้เลย 👋’;
+      ntfText.textContent=(l===’th’)?msgs_th:msgs_en;
       ntf.hidden=false;
-      setTimeout(function(){{ntf.hidden=true;}},6000);
+      ntf.classList.add(‘pop’);
+      fab.classList.add(‘shake’);
+      fab.addEventListener(‘animationend’,function(){{fab.classList.remove(‘shake’);}},{{once:true}});
     }},1500);
-    ntf.addEventListener(‘click’,function(){{ntf.hidden=true;chat.hidden=false;inp.focus();}});
   }}
-  fab.addEventListener(‘click’,function(){{chat.hidden=!chat.hidden;if(!chat.hidden){{inp.focus();if(ntf)ntf.hidden=true;}}}});
-  document.querySelectorAll('.beast-lang-btn').forEach(function(b){{
-    b.addEventListener('click',function(){{
-      document.querySelectorAll('.beast-lang-btn').forEach(function(x){{x.classList.remove('active');}});
-      b.classList.add('active');lang=b.dataset.lang;updateChips(lang);
-      inp.placeholder=lang==='th'?'พิมพ์คำถาม…':'Ask Beast 1.0…';
+
+  /* Close notification */
+  ntfClose.addEventListener(‘click’,function(e){{e.stopPropagation();dismissNotify();}});
+
+  /* FAB: toggle chat open/close */
+  fab.addEventListener(‘click’,function(){{
+    if(chat.hidden){{openChat();}}else{{closeChat();}}
+  }});
+
+  /* × button in header closes chat */
+  closeBtn.addEventListener(‘click’,function(){{closeChat();}});
+
+  /* Click outside chat closes it */
+  document.addEventListener(‘click’,function(e){{
+    if(!chat.hidden&&!chat.contains(e.target)&&!fab.contains(e.target)){{closeChat();}}
+  }});
+
+  /* Lang toggle */
+  document.querySelectorAll(‘.beast-lang-btn’).forEach(function(b){{
+    b.addEventListener(‘click’,function(e){{
+      e.stopPropagation();
+      document.querySelectorAll(‘.beast-lang-btn’).forEach(function(x){{x.classList.remove(‘active’);}});
+      b.classList.add(‘active’);lang=b.dataset.lang;updateChips(lang);
+      inp.placeholder=lang===’th’?’พิมพ์คำถาม…’:’Ask Beast 1.0…’;
     }});
   }});
-  document.querySelectorAll('.beast-chip').forEach(function(c){{c.addEventListener('click',function(){{send(c.dataset.query);}});}});
-  form.addEventListener('submit',function(){{var t=inp.value.trim();if(!t)return;inp.value='';send(t);}});
+
+  /* Chips */
+  document.querySelectorAll(‘.beast-chip’).forEach(function(c){{c.addEventListener(‘click’,function(){{send(c.dataset.query);}});}});
+
+  /* Send */
+  form.addEventListener(‘submit’,function(e){{e.preventDefault();var t=inp.value.trim();if(!t)return;inp.value=’’;send(t);}});
   function send(text){{
-    bubble(text,'user');
-    document.querySelector('.beast-chips').classList.add('compact');
+    addBubble(text,’user’);
+    document.querySelector(‘.beast-chips’).classList.add(‘compact’);
     var body={{message:text,lang:lang}};
     if(tier)body.context={{risk_tier:tier,probability:parseFloat(prob)}};
-    fetch('/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}})
+    fetch(‘/chat’,{{method:’POST’,headers:{{‘Content-Type’:’application/json’}},body:JSON.stringify(body)}})
       .then(function(r){{return r.json();}})
-      .then(function(d){{if(lang==='auto'&&d.detected_lang)lang=d.detected_lang;bubble(d.answer,'bot',d.source);}})
-      .catch(function(){{bubble('Sorry, something went wrong.','bot');}});
+      .then(function(d){{if(lang===’auto’&&d.detected_lang)lang=d.detected_lang;addBubble(d.answer,’bot’,d.source);}})
+      .catch(function(){{addBubble(‘Sorry, something went wrong.’,’bot’);}});
   }}
-  function bubble(text,role,src){{
-    var d=document.createElement('div');
-    d.className='beast-msg beast-'+role;d.textContent=text;
-    if(src){{var s=document.createElement('span');s.className='beast-src';s.textContent='Source: '+src;d.appendChild(s);}}
+  function addBubble(text,role,src){{
+    var d=document.createElement(‘div’);
+    d.className=’beast-msg beast-’+role;d.textContent=text;
+    if(src){{var s=document.createElement(‘span’);s.className=’beast-src’;s.textContent=’Source: ‘+src;d.appendChild(s);}}
     msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
   }}
   function updateChips(l){{
-    var labels={{en:['Causes','Prevention','Diet','Exercise'],th:['สาเหตุ','การป้องกัน','อาหาร','ออกกำลังกาย']}};
-    var queries={{en:['What causes obesity?','How to prevent obesity?','What should I eat?','How much should I exercise?'],th:['สาเหตุของโรคอ้วนคืออะไร','ป้องกันโรคอ้วนอย่างไร','ควรกินอะไร','ควรออกกำลังกายเท่าไหร่']}};
-    var lk=(l==='auto')?'en':l;
-    document.querySelectorAll('.beast-chip').forEach(function(c,i){{c.textContent=labels[lk][i];c.dataset.query=queries[lk][i];}});
+    var labels={{en:[‘Causes’,’Prevention’,’Diet’,’Exercise’],th:[‘สาเหตุ’,’การป้องกัน’,’อาหาร’,’ออกกำลังกาย’]}};
+    var queries={{en:[‘What causes obesity?’,’How to prevent obesity?’,’What should I eat?’,’How much should I exercise?’],th:[‘สาเหตุของโรคอ้วนคืออะไร’,’ป้องกันโรคอ้วนอย่างไร’,’ควรกินอะไร’,’ควรออกกำลังกายเท่าไหร่’]}};
+    var lk=(l===’auto’)?’en’:l;
+    document.querySelectorAll(‘.beast-chip’).forEach(function(c,i){{c.textContent=labels[lk][i];c.dataset.query=queries[lk][i];}});
   }}
 }})();
 </script>
