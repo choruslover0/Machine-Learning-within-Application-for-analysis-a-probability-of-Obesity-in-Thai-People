@@ -1884,13 +1884,13 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
   function isChatOpen(){{ return chat.classList.contains('open'); }}
 
   /* Context banner */
-  if(tier){{ctx.hidden=false;ctx.textContent='📊 Your result: '+tier+' ('+Math.round(parseFloat(prob)*100)+'%) — I\'ll tailor my answers to your score.';}}
+  if(tier){{ctx.hidden=false;ctx.textContent='📊 Your result: '+tier+' ('+Math.round(parseFloat(prob)*100)+'%) — I will tailor my answers to your score.';}}
 
   /* Notification + shake on Result / Advice pages */
   if(shouldNotify){{
     setTimeout(function(){{
       var l=(lang==='auto')?'en':lang;
-      var msgs_en='If you want any extra answers I\'m here 👋';
+      var msgs_en='If you want any extra answers, I am here 👋';
       var msgs_th='ถ้าอยากรู้เพิ่มเติม ถามฉันได้เลย 👋';
       ntfText.textContent=(l==='th')?msgs_th:msgs_en;
       ntf.hidden=false;
