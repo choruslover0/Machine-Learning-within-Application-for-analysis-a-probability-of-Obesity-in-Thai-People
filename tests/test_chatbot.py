@@ -168,6 +168,13 @@ class ChatbotWidgetTests(unittest.TestCase):
             resp = self.client.get(path)
             self.assertIn('id="beast-fab"', resp.text, msg=f"Widget missing on {path}")
 
+    def test_widget_javascript_uses_parseable_quotes(self):
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn("‘", resp.text)
+        self.assertNotIn("’", resp.text)
+        self.assertIn("document.getElementById('beast-close-btn')", resp.text)
+
 
 class ChatbotResultContextTests(unittest.TestCase):
     def setUp(self):
