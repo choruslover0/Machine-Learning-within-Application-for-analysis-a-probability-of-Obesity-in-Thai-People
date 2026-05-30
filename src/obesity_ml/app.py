@@ -1321,6 +1321,8 @@ CHAT_WIDGET_STYLE = """
     transition: background 150ms ease;
   }
   .beast-close:hover { background: rgba(255,255,255,.38); }
+  /* display:flex on .beast-chat overrides [hidden] (same specificity). Force hide. */
+  .beast-chat[hidden], .beast-notify[hidden] { display: none !important; }
   .beast-chat {
     position: fixed; bottom: 104px; right: 16px; z-index: 1000;
     width: 310px; max-height: calc(100vh - 140px); border-radius: 26px;
@@ -1862,94 +1864,94 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
 </div>
 <script>
 (function(){{
-  var fab=document.getElementById(‘beast-fab’);
-  var chat=document.getElementById(‘beast-chat’);
-  var msgs=document.getElementById(‘beast-msgs’);
-  var form=document.getElementById(‘beast-form’);
-  var inp=document.getElementById(‘beast-input’);
-  var ctx=document.getElementById(‘beast-ctx’);
-  var ntf=document.getElementById(‘beast-notify’);
-  var ntfText=document.getElementById(‘beast-notify-text’);
-  var ntfClose=document.getElementById(‘beast-notify-close’);
-  var closeBtn=document.getElementById(‘beast-close-btn’);
-  var lang=’auto’;
-  var tier=fab.dataset.riskTier||’’;
-  var prob=fab.dataset.probability||’’;
-  var shouldNotify=fab.dataset.notify===’1’;
+  var fab=document.getElementById('beast-fab');
+  var chat=document.getElementById('beast-chat');
+  var msgs=document.getElementById('beast-msgs');
+  var form=document.getElementById('beast-form');
+  var inp=document.getElementById('beast-input');
+  var ctx=document.getElementById('beast-ctx');
+  var ntf=document.getElementById('beast-notify');
+  var ntfText=document.getElementById('beast-notify-text');
+  var ntfClose=document.getElementById('beast-notify-close');
+  var closeBtn=document.getElementById('beast-close-btn');
+  var lang='auto';
+  var tier=fab.dataset.riskTier||'';
+  var prob=fab.dataset.probability||'';
+  var shouldNotify=fab.dataset.notify==='1';
 
   function closeChat(){{ chat.hidden=true; }}
   function openChat(){{ chat.hidden=false; ntf.hidden=true; inp.focus(); }}
   function dismissNotify(){{ ntf.hidden=true; }}
 
   /* Context banner */
-  if(tier){{ctx.hidden=false;ctx.textContent=’📊 Your result: ‘+tier+’ (‘+Math.round(parseFloat(prob)*100)+’%) — I\’ll tailor my answers to your score.’;}}
+  if(tier){{ctx.hidden=false;ctx.textContent='📊 Your result: '+tier+' ('+Math.round(parseFloat(prob)*100)+'%) — I\'ll tailor my answers to your score.';}}
 
   /* Notification + shake on Result / Advice pages */
   if(shouldNotify){{
     setTimeout(function(){{
-      var l=(lang===’auto’)?’en’:lang;
-      var msgs_en=’If you want any extra answers I\’m here 👋’;
-      var msgs_th=’ถ้าอยากรู้เพิ่มเติม ถามฉันได้เลย 👋’;
-      ntfText.textContent=(l===’th’)?msgs_th:msgs_en;
+      var l=(lang==='auto')?'en':lang;
+      var msgs_en='If you want any extra answers I\'m here 👋';
+      var msgs_th='ถ้าอยากรู้เพิ่มเติม ถามฉันได้เลย 👋';
+      ntfText.textContent=(l==='th')?msgs_th:msgs_en;
       ntf.hidden=false;
-      ntf.classList.add(‘pop’);
-      fab.classList.add(‘shake’);
-      fab.addEventListener(‘animationend’,function(){{fab.classList.remove(‘shake’);}},{{once:true}});
+      ntf.classList.add('pop');
+      fab.classList.add('shake');
+      fab.addEventListener('animationend',function(){{fab.classList.remove('shake');}},{{once:true}});
     }},1500);
   }}
 
   /* Close notification */
-  ntfClose.addEventListener(‘click’,function(e){{e.stopPropagation();dismissNotify();}});
+  ntfClose.addEventListener('click',function(e){{e.stopPropagation();dismissNotify();}});
 
   /* FAB: toggle chat open/close */
-  fab.addEventListener(‘click’,function(){{
+  fab.addEventListener('click',function(){{
     if(chat.hidden){{openChat();}}else{{closeChat();}}
   }});
 
   /* × button in header closes chat */
-  closeBtn.addEventListener(‘click’,function(){{closeChat();}});
+  closeBtn.addEventListener('click',function(){{closeChat();}});
 
   /* Click outside chat closes it */
-  document.addEventListener(‘click’,function(e){{
+  document.addEventListener('click',function(e){{
     if(!chat.hidden&&!chat.contains(e.target)&&!fab.contains(e.target)){{closeChat();}}
   }});
 
   /* Lang toggle */
-  document.querySelectorAll(‘.beast-lang-btn’).forEach(function(b){{
-    b.addEventListener(‘click’,function(e){{
+  document.querySelectorAll('.beast-lang-btn').forEach(function(b){{
+    b.addEventListener('click',function(e){{
       e.stopPropagation();
-      document.querySelectorAll(‘.beast-lang-btn’).forEach(function(x){{x.classList.remove(‘active’);}});
-      b.classList.add(‘active’);lang=b.dataset.lang;updateChips(lang);
-      inp.placeholder=lang===’th’?’พิมพ์คำถาม…’:’Ask Beast 1.0…’;
+      document.querySelectorAll('.beast-lang-btn').forEach(function(x){{x.classList.remove('active');}});
+      b.classList.add('active');lang=b.dataset.lang;updateChips(lang);
+      inp.placeholder=lang==='th'?'พิมพ์คำถาม…':'Ask Beast 1.0…';
     }});
   }});
 
   /* Chips */
-  document.querySelectorAll(‘.beast-chip’).forEach(function(c){{c.addEventListener(‘click’,function(){{send(c.dataset.query);}});}});
+  document.querySelectorAll('.beast-chip').forEach(function(c){{c.addEventListener('click',function(){{send(c.dataset.query);}});}});
 
   /* Send */
-  form.addEventListener(‘submit’,function(e){{e.preventDefault();var t=inp.value.trim();if(!t)return;inp.value=’’;send(t);}});
+  form.addEventListener('submit',function(e){{e.preventDefault();var t=inp.value.trim();if(!t)return;inp.value='';send(t);}});
   function send(text){{
-    addBubble(text,’user’);
-    document.querySelector(‘.beast-chips’).classList.add(‘compact’);
+    addBubble(text,'user');
+    document.querySelector('.beast-chips').classList.add('compact');
     var body={{message:text,lang:lang}};
     if(tier)body.context={{risk_tier:tier,probability:parseFloat(prob)}};
-    fetch(‘/chat’,{{method:’POST’,headers:{{‘Content-Type’:’application/json’}},body:JSON.stringify(body)}})
+    fetch('/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}})
       .then(function(r){{return r.json();}})
-      .then(function(d){{if(lang===’auto’&&d.detected_lang)lang=d.detected_lang;addBubble(d.answer,’bot’,d.source);}})
-      .catch(function(){{addBubble(‘Sorry, something went wrong.’,’bot’);}});
+      .then(function(d){{if(lang==='auto'&&d.detected_lang)lang=d.detected_lang;addBubble(d.answer,'bot',d.source);}})
+      .catch(function(){{addBubble('Sorry, something went wrong.','bot');}});
   }}
   function addBubble(text,role,src){{
-    var d=document.createElement(‘div’);
-    d.className=’beast-msg beast-’+role;d.textContent=text;
-    if(src){{var s=document.createElement(‘span’);s.className=’beast-src’;s.textContent=’Source: ‘+src;d.appendChild(s);}}
+    var d=document.createElement('div');
+    d.className='beast-msg beast-'+role;d.textContent=text;
+    if(src){{var s=document.createElement('span');s.className='beast-src';s.textContent='Source: '+src;d.appendChild(s);}}
     msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
   }}
   function updateChips(l){{
-    var labels={{en:[‘Causes’,’Prevention’,’Diet’,’Exercise’],th:[‘สาเหตุ’,’การป้องกัน’,’อาหาร’,’ออกกำลังกาย’]}};
-    var queries={{en:[‘What causes obesity?’,’How to prevent obesity?’,’What should I eat?’,’How much should I exercise?’],th:[‘สาเหตุของโรคอ้วนคืออะไร’,’ป้องกันโรคอ้วนอย่างไร’,’ควรกินอะไร’,’ควรออกกำลังกายเท่าไหร่’]}};
-    var lk=(l===’auto’)?’en’:l;
-    document.querySelectorAll(‘.beast-chip’).forEach(function(c,i){{c.textContent=labels[lk][i];c.dataset.query=queries[lk][i];}});
+    var labels={{en:['Causes','Prevention','Diet','Exercise'],th:['สาเหตุ','การป้องกัน','อาหาร','ออกกำลังกาย']}};
+    var queries={{en:['What causes obesity?','How to prevent obesity?','What should I eat?','How much should I exercise?'],th:['สาเหตุของโรคอ้วนคืออะไร','ป้องกันโรคอ้วนอย่างไร','ควรกินอะไร','ควรออกกำลังกายเท่าไหร่']}};
+    var lk=(l==='auto')?'en':l;
+    document.querySelectorAll('.beast-chip').forEach(function(c,i){{c.textContent=labels[lk][i];c.dataset.query=queries[lk][i];}});
   }}
 }})();
 </script>
