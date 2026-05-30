@@ -1339,6 +1339,26 @@ CHAT_WIDGET_STYLE = """
   .beast-input { flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; font-size: 12px; outline: none; background: #fafafa; font-family: inherit; }
   .beast-input:focus { box-shadow: 0 0 0 3px rgba(225,48,108,.16); background: #fff; }
   .beast-send { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; background: linear-gradient(135deg, var(--hot), var(--sun)); border: 0; color: white; font-size: 13px; cursor: pointer; display: grid; place-items: center; }
+  .beast-notify {
+    position: fixed; bottom: 100px; right: 96px; z-index: 1001;
+    background: white; border: 1.5px solid rgba(225,48,108,.30);
+    border-radius: 18px 18px 4px 18px;
+    padding: 10px 14px; font-size: 12px; font-weight: 800; line-height: 1.4;
+    color: var(--ink); box-shadow: 0 10px 28px rgba(21,21,26,.16);
+    max-width: 210px; cursor: pointer;
+    animation: notifyIn 350ms cubic-bezier(.34,1.56,.64,1) both;
+  }
+  .beast-notify::after {
+    content: ""; position: absolute; bottom: -8px; right: 18px;
+    width: 14px; height: 14px; background: white;
+    border-right: 1.5px solid rgba(225,48,108,.30);
+    border-bottom: 1.5px solid rgba(225,48,108,.30);
+    transform: rotate(45deg); clip-path: polygon(0 0, 100% 100%, 0 100%);
+  }
+  @keyframes notifyIn {
+    from {{ opacity: 0; transform: scale(.85) translateY(8px); }}
+    to   {{ opacity: 1; transform: scale(1)  translateY(0);    }}
+  }
 </style>
 """
 
@@ -1365,7 +1385,8 @@ class ChatRequest(BaseModel):
 def page_shell(title: str, body: str, chat_context: dict | None = None) -> str:
     risk_tier = chat_context.get("risk_tier", "") if chat_context else ""
     probability = str(chat_context.get("probability", "")) if chat_context else ""
-    widget = chat_widget_html(risk_tier, probability)
+    notify = bool(chat_context.get("notify", False)) if chat_context else False
+    widget = chat_widget_html(risk_tier, probability, notify)
     return f"""
     <!doctype html>
     <html lang="en">
@@ -1774,13 +1795,14 @@ def producer_section_html() -> str:
     """
 
 
-def chat_widget_html(risk_tier: str = "", probability: str = "") -> str:
+def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = False) -> str:
     tier_attr = f'data-risk-tier="{escape(risk_tier, quote=True)}"'
     prob_attr = f'data-probability="{escape(probability, quote=True)}"'
-    badge_style = 'style="display:block"' if risk_tier else ""
+    notify_attr = 'data-notify="1"' if notify else ""
+    badge_style = 'style="display:block"' if (risk_tier or notify) else ""
     return f"""
 {CHAT_WIDGET_STYLE}
-<button id="beast-fab" class="beast-fab" aria-label="Open Beast 1.0 chat" {tier_attr} {prob_attr}>
+<button id="beast-fab" class="beast-fab" aria-label="Open Beast 1.0 chat" {tier_attr} {prob_attr} {notify_attr}>
   <img src="/static/beast1-logo.png" alt="Beast 1.0 logo">
   <span class="beast-fab-label">Beast 1.0</span>
   <span class="beast-fab-badge" {badge_style}></span>
@@ -1809,19 +1831,35 @@ def chat_widget_html(risk_tier: str = "", probability: str = "") -> str:
     <button type="submit" class="beast-send" aria-label="Send">&#x27A4;</button>
   </form>
 </div>
+</div>
+<div id="beast-notify" class="beast-notify" hidden
+  data-en="🦁 Have questions about your result? Ask Beast 1.0!"
+  data-th="🦁 มีคำถามเกี่ยวกับผลลัพธ์ไหม? ถาม Beast 1.0 ได้เลย!">
+</div>
 <script>
 (function(){{
-  var fab=document.getElementById('beast-fab');
-  var chat=document.getElementById('beast-chat');
-  var msgs=document.getElementById('beast-msgs');
-  var form=document.getElementById('beast-form');
-  var inp=document.getElementById('beast-input');
-  var ctx=document.getElementById('beast-ctx');
-  var lang='auto';
-  var tier=fab.dataset.riskTier||'';
-  var prob=fab.dataset.probability||'';
-  if(tier){{ctx.hidden=false;ctx.textContent='📊 Your result: '+tier+' ('+Math.round(parseFloat(prob)*100)+'%) — I’ll tailor my answers to your score.';}}
-  fab.addEventListener('click',function(){{chat.hidden=!chat.hidden;if(!chat.hidden)inp.focus();}});
+  var fab=document.getElementById(‘beast-fab’);
+  var chat=document.getElementById(‘beast-chat’);
+  var msgs=document.getElementById(‘beast-msgs’);
+  var form=document.getElementById(‘beast-form’);
+  var inp=document.getElementById(‘beast-input’);
+  var ctx=document.getElementById(‘beast-ctx’);
+  var ntf=document.getElementById(‘beast-notify’);
+  var lang=’auto’;
+  var tier=fab.dataset.riskTier||’’;
+  var prob=fab.dataset.probability||’’;
+  var shouldNotify=fab.dataset.notify===’1’;
+  if(tier){{ctx.hidden=false;ctx.textContent=’📊 Your result: ‘+tier+’ (‘+Math.round(parseFloat(prob)*100)+’%) — I\’ll tailor my answers to your score.’;}}
+  if(shouldNotify&&ntf){{
+    setTimeout(function(){{
+      var l=(lang===’auto’)?’en’:lang;
+      ntf.textContent=ntf.getAttribute(‘data-’+l)||ntf.getAttribute(‘data-en’);
+      ntf.hidden=false;
+      setTimeout(function(){{ntf.hidden=true;}},6000);
+    }},1500);
+    ntf.addEventListener(‘click’,function(){{ntf.hidden=true;chat.hidden=false;inp.focus();}});
+  }}
+  fab.addEventListener(‘click’,function(){{chat.hidden=!chat.hidden;if(!chat.hidden){{inp.focus();if(ntf)ntf.hidden=true;}}}});
   document.querySelectorAll('.beast-lang-btn').forEach(function(b){{
     b.addEventListener('click',function(){{
       document.querySelectorAll('.beast-lang-btn').forEach(function(x){{x.classList.remove('active');}});
@@ -2105,7 +2143,7 @@ def advice_from_form(
       </div>
     </section>
     """
-    return page_shell("Advice - O-Beast", body)
+    return page_shell("Advice - O-Beast", body, chat_context={"notify": True})
 
 
 @app.post("/predict-form", response_class=HTMLResponse)
@@ -2180,5 +2218,6 @@ def predict_form(
         chat_context={
             "risk_tier": result["risk_tier_label"],
             "probability": result["obesity_probability"],
+            "notify": True,
         },
     )
