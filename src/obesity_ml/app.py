@@ -1331,10 +1331,10 @@ CHAT_WIDGET_STYLE = """
   .beast-bot { background: #f4f4f5; border-radius: 16px 16px 16px 4px; padding: 9px 12px; }
   .beast-user { background: linear-gradient(135deg, var(--violet), var(--hot)); color: white; border-radius: 16px 16px 4px 16px; padding: 9px 12px; align-self: flex-end; }
   .beast-src { display: block; margin-top: 4px; font-size: 10px; color: var(--muted); font-weight: 800; }
-  .beast-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 12px 10px; }
-  .beast-chip { border: 1px solid rgba(225,48,108,.28); border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 900; color: var(--hot); background: rgba(225,48,108,.06); cursor: pointer; font-family: inherit; white-space: nowrap; transition: padding 200ms ease, font-size 200ms ease; }
-  .beast-chips.compact { gap: 4px; padding: 3px 12px 8px; }
-  .beast-chips.compact .beast-chip { padding: 3px 8px; font-size: 10px; }
+  .beast-chips { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 5px; padding: 4px 12px 10px; }
+  .beast-chip { flex: 0 0 auto; width: auto; display: inline-flex; align-items: center; border: 1px solid rgba(225,48,108,.28); border-radius: 999px; padding: 5px 12px; font-size: 11px; font-weight: 900; color: var(--hot); background: rgba(225,48,108,.06); cursor: pointer; font-family: inherit; white-space: nowrap; transition: padding 150ms ease, font-size 150ms ease, opacity 150ms ease; }
+  .beast-chips.compact { gap: 4px; padding: 2px 12px 6px; }
+  .beast-chips.compact .beast-chip { padding: 3px 9px; font-size: 10px; opacity: 0.75; }
   .beast-form { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
   .beast-input { flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; font-size: 12px; outline: none; background: #fafafa; font-family: inherit; }
   .beast-input:focus { box-shadow: 0 0 0 3px rgba(225,48,108,.16); background: #fff; }
