@@ -1321,9 +1321,8 @@ CHAT_WIDGET_STYLE = """
     transition: background 150ms ease;
   }
   .beast-close:hover { background: rgba(255,255,255,.38); }
-  /* display:flex on .beast-chat overrides [hidden] (same specificity). Force hide. */
-  .beast-chat[hidden], .beast-notify[hidden] { display: none !important; }
   .beast-chat {
+    display: none;
     position: fixed; bottom: 104px; right: 16px; z-index: 1000;
     width: 310px; max-height: calc(100vh - 140px); border-radius: 26px;
     background: rgba(255,255,255,0.97);
@@ -1331,8 +1330,9 @@ CHAT_WIDGET_STYLE = """
     box-shadow: 0 28px 72px rgba(21,21,26,.20);
     overflow: hidden; font-size: 13px;
     font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-    display: flex; flex-direction: column;
+    flex-direction: column;
   }
+  .beast-chat.open { display: flex; }
   .beast-head {
     padding: 12px 14px;
     background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
@@ -1832,7 +1832,7 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
   <span class="beast-fab-label">Beast 1.0</span>
   <span class="beast-fab-badge" {badge_style}></span>
 </button>
-<div id="beast-chat" class="beast-chat" hidden>
+<div id="beast-chat" class="beast-chat">
   <div class="beast-head">
     <img class="beast-head-img" src="/static/beast1-logo.png" alt="Beast 1.0">
     <div class="beast-head-info"><strong>Beast 1.0</strong><small>Obesity Q&amp;A &middot; Online</small></div>
@@ -1857,7 +1857,6 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
     <button type="submit" class="beast-send" aria-label="Send">&#x27A4;</button>
   </form>
 </div>
-</div>
 <div id="beast-notify" class="beast-notify" hidden>
   <span class="beast-notify-text" id="beast-notify-text"></span>
   <button class="beast-notify-close" id="beast-notify-close" aria-label="Dismiss">&#x2715;</button>
@@ -1879,9 +1878,10 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
   var prob=fab.dataset.probability||'';
   var shouldNotify=fab.dataset.notify==='1';
 
-  function closeChat(){{ chat.hidden=true; }}
-  function openChat(){{ chat.hidden=false; ntf.hidden=true; inp.focus(); }}
+  function closeChat(){{ chat.classList.remove('open'); }}
+  function openChat(){{ chat.classList.add('open'); ntf.hidden=true; inp.focus(); }}
   function dismissNotify(){{ ntf.hidden=true; }}
+  function isChatOpen(){{ return chat.classList.contains('open'); }}
 
   /* Context banner */
   if(tier){{ctx.hidden=false;ctx.textContent='📊 Your result: '+tier+' ('+Math.round(parseFloat(prob)*100)+'%) — I\'ll tailor my answers to your score.';}}
@@ -1905,7 +1905,7 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
 
   /* FAB: toggle chat open/close */
   fab.addEventListener('click',function(){{
-    if(chat.hidden){{openChat();}}else{{closeChat();}}
+    if(isChatOpen()){{closeChat();}}else{{openChat();}}
   }});
 
   /* × button in header closes chat */
@@ -1913,7 +1913,7 @@ def chat_widget_html(risk_tier: str = "", probability: str = "", notify: bool = 
 
   /* Click outside chat closes it */
   document.addEventListener('click',function(e){{
-    if(!chat.hidden&&!chat.contains(e.target)&&!fab.contains(e.target)){{closeChat();}}
+    if(isChatOpen()&&!chat.contains(e.target)&&!fab.contains(e.target)){{closeChat();}}
   }});
 
   /* Lang toggle */
