@@ -89,7 +89,6 @@ STYLE = """
       radial-gradient(circle at 16% 8%, rgba(252, 175, 69, 0.34), transparent 28%),
       radial-gradient(circle at 92% 18%, rgba(225, 48, 108, 0.30), transparent 25%),
       linear-gradient(135deg, #fff7ed 0%, #fff 38%, #f4f7fb 100%);
-    animation: pageIn 520ms ease-out both;
   }
 
   a { color: inherit; }
@@ -98,6 +97,7 @@ STYLE = """
     width: min(1160px, calc(100vw - 32px));
     margin: 0 auto;
     padding: 28px 0 46px;
+    animation: pageIn 520ms ease-out both;
   }
 
   .nav {
@@ -1224,8 +1224,8 @@ STYLE = """
   }
 
   @keyframes pageIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes cardIn {
@@ -1306,12 +1306,13 @@ CHAT_WIDGET_STYLE = """
   }
   .beast-chat {
     position: fixed; bottom: 104px; right: 16px; z-index: 1000;
-    width: 310px; border-radius: 26px;
+    width: 310px; max-height: calc(100vh - 140px); border-radius: 26px;
     background: rgba(255,255,255,0.97);
     border: 1px solid var(--line);
     box-shadow: 0 28px 72px rgba(21,21,26,.20);
     overflow: hidden; font-size: 13px;
     font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    display: flex; flex-direction: column;
   }
   .beast-head {
     padding: 12px 14px;
@@ -1325,15 +1326,15 @@ CHAT_WIDGET_STYLE = """
   .beast-lang-btn { padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 900; color: rgba(255,255,255,.75); border: 0; background: transparent; cursor: pointer; font-family: inherit; }
   .beast-lang-btn.active { background: rgba(255,255,255,.30); color: white; }
   .beast-ctx { margin: 8px 12px 0; border-radius: 14px; padding: 8px 12px; background: rgba(225,48,108,.08); border: 1px solid rgba(225,48,108,.22); font-size: 11px; color: var(--hot); font-weight: 800; line-height: 1.4; }
-  .beast-msgs { padding: 12px; display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+  .beast-msgs { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; min-height: 80px; }
   .beast-msg { line-height: 1.4; max-width: 88%; }
   .beast-bot { background: #f4f4f5; border-radius: 16px 16px 16px 4px; padding: 9px 12px; }
   .beast-user { background: linear-gradient(135deg, var(--violet), var(--hot)); color: white; border-radius: 16px 16px 4px 16px; padding: 9px 12px; align-self: flex-end; }
   .beast-src { display: block; margin-top: 4px; font-size: 10px; color: var(--muted); font-weight: 800; }
-  .beast-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 10px; transition: all 200ms ease; }
-  .beast-chip { border: 1px solid rgba(225,48,108,.28); border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 900; color: var(--hot); background: rgba(225,48,108,.06); cursor: pointer; font-family: inherit; transition: padding 200ms ease, font-size 200ms ease; }
+  .beast-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 12px 10px; }
+  .beast-chip { border: 1px solid rgba(225,48,108,.28); border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 900; color: var(--hot); background: rgba(225,48,108,.06); cursor: pointer; font-family: inherit; white-space: nowrap; transition: padding 200ms ease, font-size 200ms ease; }
   .beast-chips.compact { gap: 4px; padding: 3px 12px 8px; }
-  .beast-chips.compact .beast-chip { padding: 3px 9px; font-size: 10px; }
+  .beast-chips.compact .beast-chip { padding: 3px 8px; font-size: 10px; }
   .beast-form { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
   .beast-input { flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; font-size: 12px; outline: none; background: #fafafa; font-family: inherit; }
   .beast-input:focus { box-shadow: 0 0 0 3px rgba(225,48,108,.16); background: #fff; }
