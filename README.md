@@ -1,102 +1,84 @@
-# Obesity Probability ML App
+# O-Beast
 
-This project is a starter machine-learning application for estimating the probability that a person belongs to an obesity-risk group.
+Educational obesity-risk probability app for Thai student research.
 
-Important: this is an educational research tool, not a medical diagnosis tool.
+O-Beast collects body, lifestyle, and family-history answers, estimates an educational obesity-risk probability, explains model methods, and gives transparent wellness advice. It is not a medical diagnosis tool.
 
-## Data Format
-
-Put your real training CSV at:
-
-```text
-data/raw/obesity_training.csv
-```
-
-Required columns:
-
-```text
-age
-sex
-height_cm
-weight_kg
-physical_activity_hours_per_week
-screen_time_hours_per_day
-sleep_hours
-fast_food_meals_per_week
-sugary_drinks_per_day
-family_history_obesity
-obesity
-```
-
-`obesity` should be `0` for no obesity and `1` for obesity.
-
-Optional columns supported by the newer importer:
-
-```text
-high_calorie_food_frequency
-vegetable_frequency
-main_meals_per_day
-food_between_meals_frequency
-smoke
-physical_activity_missing
-screen_time_missing
-fast_food_missing
-sugary_drinks_missing
-```
-
-## Google Form Import
-
-The project can now normalize both Google Form styles used in the research:
-
-- Form 1: lifestyle, screen time, sleep, fast food, sugary drinks, family history, and self-reported obesity.
-- Form 2: UCI-style habits such as high-calorie food, vegetables, meals per day, food between meals, smoking, sleep, family history, height, and weight.
-
-Form 2 does not ask every question from Form 1. The importer fills neutral values for missing cross-form questions and adds missingness flags, so the model can learn that those answers were not actually collected.
-
-Example:
-
-```bash
-PYTHONPATH=src python -m obesity_ml.form_import \
-  --input form1.csv form2.csv \
-  --output data/raw/normalized_obesity_training.csv
-```
-
-The prototype target is created from BMI using a default threshold of `25.0`, which is a high-risk screening threshold in many Asian adult BMI references. This should be reviewed before the final research analysis.
-
-## Run
+## Start Here
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m obesity_ml.train --data data/sample_obesity_training.csv
-uvicorn obesity_ml.app:app --reload
+PYTHONPATH=src python3 -m obesity_ml.train --data data/processed/current_google_forms_training.csv
+PYTHONPATH=src uvicorn obesity_ml.app:app --reload
 ```
 
-Then open:
+Open:
 
 ```text
 http://127.0.0.1:8000
 ```
-# Machine-Learning-within-Application-for-analysis-a-probability-of-Obesity-in-Thai-People
 
-## Current ML Protocol
+## Current Workflow
 
-The training pipeline now uses a safer research prototype workflow:
+1. Import Google Form CSV data.
+2. Clean and normalize survey columns.
+3. Create BMI for screening, not for lifestyle ML features.
+4. Train lifestyle ML model from habits and family-history signals.
+5. Compare candidate algorithms with stratified cross-validation.
+6. Keep hold-out test data for final reporting only.
+7. Calculate final probability with a 50/50 blend:
 
-- Model selection is based on stratified cross-validation on the training split.
-- The final test split is kept separate for reporting only.
-- Class imbalance is handled with SMOTENC before preprocessing, so categorical survey answers are not turned into unrealistic fractional one-hot values.
-- Calibration is only performed when there is enough training data for a separate calibration split; the final test set is not used for calibration.
-- The UI describes the selected model as the best model for the current training data, not as a universal medical truth.
-- Candidate algorithms include logistic regression, support vector machine, random forest, Gaussian Naive Bayes, neural network, and XGBoost when installed.
-- Evaluation now records Accuracy, Cohen's Kappa, Sensitivity, and Specificity, matching the style of comparative obesity ML papers, while still using ROC-AUC, F1, and Brier score for probability-model selection.
-- Prediction output now uses five probability tiers: very low, low, moderate, high, and very high.
+```text
+final probability = 0.5 * lifestyle_probability + 0.5 * bmi_screen_score
+```
 
-The included sample CSV is intentionally tiny and exists only to prove the app and algorithms run. Real conclusions should wait for the completed experimental dataset.
+8. Convert final probability into five risk tiers and show advice.
 
-## Wellness Advice Page
+## Main Files
 
-The app includes an educational rule-based advice page. It uses the user's answers plus the model probability to suggest practical wellness habits for activity, sedentary time, sleep, sugary drinks, fast food, BMI awareness, and family-history awareness.
+```text
+src/obesity_ml/app.py          FastAPI routes and UI
+src/obesity_ml/train.py        ML training, model comparison, metrics
+src/obesity_ml/predict.py      Prediction, BMI score, final probability blend
+src/obesity_ml/form_import.py  Google Form normalization
+src/obesity_ml/advice.py       Wellness advice logic
+src/obesity_ml/risk_tiers.py   Five probability tiers and BMI screening tiers
+data/                          Sample, raw, and processed data
+models/                        Trained joblib artifacts
+docs/                          Architecture, API, tasks, research docs
+memory/                        Project memory snapshots and older notes
+research-assets/               Research workflow images and PDFs
+```
 
-The advice rules are intentionally transparent and are based on public-health references from WHO, CDC, and Thai food-based dietary guidance. They are not a diagnosis or treatment plan.
+## Core Docs
+
+- [AGENTS.md](./AGENTS.md) - instructions for Codex and AI coding agents
+- [CLAUDE.md](./CLAUDE.md) - instructions for Claude/Codex CLI-style agents
+- [CONTEXT.md](./CONTEXT.md) - project language glossary
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - system design and data flow
+- [docs/API.md](./docs/API.md) - app routes and request shapes
+- [docs/TASKS.md](./docs/TASKS.md) - current work queue
+- [CHANGELOG.md](./CHANGELOG.md) - project history
+
+## Data Notes
+
+Current processed training data:
+
+```text
+data/processed/current_google_forms_training.csv
+```
+
+Raw Google Form exports:
+
+```text
+data/raw/google_form_1_current.csv
+data/raw/google_form_2_current.csv
+```
+
+The current prototype target still comes from BMI thresholding. Future doctor-diagnosis labels should replace this target when available.
+
+## Safety
+
+O-Beast gives educational probability estimates only. It should not replace doctors, nutrition professionals, clinical diagnosis, or treatment plans.
