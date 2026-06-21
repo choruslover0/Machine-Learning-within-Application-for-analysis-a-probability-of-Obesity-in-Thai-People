@@ -19,11 +19,43 @@ NEUTRAL_MISSING_DEFAULTS = {
     "sugary_drinks_per_day": 0.5,
 }
 
+FORM1_HEADER_PATTERNS = {
+    "อายุ": ("อายุ",),
+    "ส่วนสูง": ("ส่วนสูง",),
+    "น้ำหนัก": ("น้ำหนัก",),
+    "ออกกำลังกายกี่ชั่วโมงต่อสัปดาห์": ("ออกกำลังกาย", "ชั่วโมงต่อสัปดาห์"),
+    "ใช้หน้าจอวันละกี่ชั่วโมงต่อวัน": ("ใช้หน้าจอ", "ชั่วโมงต่อวัน"),
+    "นอนกี่ชั่วโมงต่อวัน": ("นอน", "ชั่วโมงต่อวัน"),
+    "กินอาหารไร้ประโยชน์กี่มื้อต่อสัปดาห์": ("กินอาหารไร้ประโยชน์", "มื้อต่อสัปดาห์"),
+    "กินน้ำหวานหรือน้ำอัดลมกี่ครั้งต่อวัน": ("กินน้ำหวานหรือน้ำอัดลม", "ครั้งต่อวัน"),
+}
+
 
 def _text(value) -> str:
     if pd.isna(value):
         return ""
     return str(value).strip()
+
+
+def _canonicalize_headers(df: pd.DataFrame, patterns: dict[str, tuple[str, ...]]) -> pd.DataFrame:
+    rename = {}
+    normalized_columns = {
+        column: re.sub(r"\s+", " ", str(column).splitlines()[0]).strip() for column in df.columns
+    }
+    for canonical, required_parts in patterns.items():
+        if canonical in df.columns:
+            continue
+        match = next(
+            (
+                column
+                for column, normalized in normalized_columns.items()
+                if all(part in normalized for part in required_parts)
+            ),
+            None,
+        )
+        if match is not None:
+            rename[match] = canonical
+    return df.rename(columns=rename)
 
 
 def parse_number(value, default=pd.NA, *, minimum: float | None = None, maximum: float | None = None):
@@ -108,6 +140,7 @@ def add_bmi_target(frame: pd.DataFrame, *, threshold: float = 25.0) -> pd.DataFr
 
 
 def normalize_form1_frame(df: pd.DataFrame, *, bmi_target_threshold: float = 25.0) -> pd.DataFrame:
+    df = _canonicalize_headers(df, FORM1_HEADER_PATTERNS)
     rows = []
     for _, row in df.iterrows():
         if not consent_allows(row.get("ขออนุญาตนำข้อมูลไปใช้นะครับ")):

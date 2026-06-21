@@ -19,6 +19,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     roc_auc_score,
+    roc_curve,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 from sklearn.naive_bayes import GaussianNB
@@ -28,6 +29,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import SVC
 
 from obesity_ml.config import (
+    BODY_SCREEN_FEATURES,
     CATEGORICAL_FEATURES,
     MODEL_DIR,
     MODEL_PATH,
@@ -233,13 +235,28 @@ def cross_validation_strategy(y_train: pd.Series) -> StratifiedKFold | None:
     return StratifiedKFold(n_splits=min(5, minority_count), shuffle=True, random_state=42)
 
 
-def cross_validated_metrics(model: Pipeline, x_train: pd.DataFrame, y_train: pd.Series) -> dict[str, float]:
+def cross_validated_evaluation(
+    model: Pipeline,
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+) -> tuple[dict[str, float], dict[str, list[float]] | None]:
     cv = cross_validation_strategy(y_train)
     if cv is None:
         model.fit(x_train, y_train)
-        return evaluate_model(model, x_train, y_train)
+        return evaluate_model(model, x_train, y_train), None
     probability = cross_val_predict(model, x_train, y_train, cv=cv, method="predict_proba")[:, 1]
-    return evaluate_probabilities(y_train, probability)
+    metrics = evaluate_probabilities(y_train, probability)
+    false_positive_rate, true_positive_rate, _ = roc_curve(y_train, probability)
+    curve = {
+        "false_positive_rate": [float(value) for value in false_positive_rate],
+        "true_positive_rate": [float(value) for value in true_positive_rate],
+    }
+    return metrics, curve
+
+
+def cross_validated_metrics(model: Pipeline, x_train: pd.DataFrame, y_train: pd.Series) -> dict[str, float]:
+    metrics, _ = cross_validated_evaluation(model, x_train, y_train)
+    return metrics
 
 
 def split_training_and_calibration(x_train: pd.DataFrame, y_train: pd.Series):
@@ -286,9 +303,12 @@ def train(data_path: Path, model_path: Path = MODEL_PATH) -> dict[str, object]:
     x_fit, x_calibration, y_fit, y_calibration = split_training_and_calibration(x_train, y_train)
 
     validation_results = {}
+    roc_curves = {}
     trained_models = {}
     for name, model in candidate_models(y_train).items():
-        validation_results[name] = cross_validated_metrics(model, x_train, y_train)
+        validation_results[name], curve = cross_validated_evaluation(model, x_train, y_train)
+        if curve is not None:
+            roc_curves[name] = curve
         _clamp_smotenc_k_neighbors(model, y_fit)
         model.fit(x_fit, y_fit)
         if x_calibration is not None and y_calibration is not None:
@@ -304,8 +324,10 @@ def train(data_path: Path, model_path: Path = MODEL_PATH) -> dict[str, object]:
         "model": best_model,
         "base_model_name": best_name,
         "metrics": validation_results,
+        "roc_curves": roc_curves,
         "test_metrics": test_results,
         "feature_columns": list(x.columns),
+        "excluded_body_screen_features": BODY_SCREEN_FEATURES,
         "target_column": TARGET_COLUMN,
         "used_smote": can_use_smote(y_train),
         "candidate_methods": list(validation_results.keys()),
@@ -314,6 +336,7 @@ def train(data_path: Path, model_path: Path = MODEL_PATH) -> dict[str, object]:
         "selection_rule": "Choose highest cross-validated ROC-AUC, then F1, then fewer extreme probabilities, then lowest Brier score; report Accuracy, Kappa, Sensitivity, and Specificity like obesity ML comparison papers.",
         "validation_strategy": "Stratified cross-validation on the training split; final test split is kept for reporting only.",
         "resampling_strategy": "SMOTENC before preprocessing for categorical-safe balancing." if can_use_smote(y_train) else "Class weights/fallback only; SMOTENC skipped because data is too small or unavailable.",
+        "probability_blend_strategy": "Final probability = 50% lifestyle_probability + 50% bmi_screen_score. BMI, height, and weight are excluded from ML model features.",
         "dataset_warning": dataset_warning(len(df)),
         "disclaimer": "Educational risk-estimation model only; not a medical diagnosis.",
     }

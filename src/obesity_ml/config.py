@@ -20,11 +20,22 @@ CHATBOT_MODEL_PATH = MODEL_DIR / "chatbot_model.joblib"
 
 TARGET_COLUMN = "obesity"
 
-NUMERIC_FEATURES = [
-    "age",
+BODY_SCREEN_FEATURES = [
     "height_cm",
     "weight_kg",
     "bmi",
+]
+
+# --- BMI screening signal (independent of the lifestyle ML model) ---
+# bmi_screen_score crosses 0.5 at the midpoint and rises GRADUALLY (graded, not a
+# hard cutoff at BMI 25). Kept separate from the model so BMI informs the final
+# blend WITHOUT leaking into a model whose label is itself BMI-derived. A larger
+# steepness = gentler curve, so lifestyle keeps a real say in the 50/50 blend.
+BMI_SCREEN_MIDPOINT = 25.0   # Asian-adult obesity threshold; screen score = 0.5 here
+BMI_SCREEN_STEEPNESS = 3.0   # logistic scale in BMI units (smaller = sharper step)
+
+NUMERIC_FEATURES = [
+    "age",
     "physical_activity_hours_per_week",
     "screen_time_hours_per_day",
     "sleep_hours",

@@ -13,6 +13,26 @@ sys.path.insert(0, str(SRC_DIR))
 
 
 class AppRegressionTests(unittest.TestCase):
+    def test_testclient_import_does_not_emit_starlette_deprecation_warning(self):
+        import importlib
+        import sys
+        import warnings
+        from starlette.exceptions import StarletteDeprecationWarning
+
+        sys.modules.pop("fastapi.testclient", None)
+        sys.modules.pop("starlette.testclient", None)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", StarletteDeprecationWarning)
+            importlib.import_module("fastapi.testclient")
+
+        messages = [
+            str(warning.message)
+            for warning in caught
+            if issubclass(warning.category, StarletteDeprecationWarning)
+        ]
+        self.assertEqual(messages, [])
+
     def test_app_imports_from_non_project_working_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             env = os.environ.copy()
@@ -56,10 +76,10 @@ class AppRegressionTests(unittest.TestCase):
         from obesity_ml.app import app
 
         client = TestClient(app)
-        response = client.get("/static/obeast-logo.svg")
+        response = client.get("/static/obeast-logo.png")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("svg", response.headers["content-type"])
+        self.assertEqual(response.headers["content-type"], "image/png")
 
     def test_predict_api_rejects_invalid_json_values(self):
         from fastapi.testclient import TestClient
@@ -135,6 +155,117 @@ class AppRegressionTests(unittest.TestCase):
 
 
 class TrainingPipelineTests(unittest.TestCase):
+    def test_training_artifact_excludes_body_features_from_lifestyle_model(self):
+        import tempfile
+        import pandas as pd
+        from pathlib import Path
+        from obesity_ml.train import train
+
+        rows = []
+        for i in range(60):
+            rows.append({
+                "age": 16 + (i % 4), "sex": "M" if i % 2 else "F",
+                "height_cm": 160.0 + (i % 12), "weight_kg": 50.0 + i,
+                "physical_activity_hours_per_week": 2.0 + (i % 5),
+                "screen_time_hours_per_day": 3.0 + (i % 6),
+                "sleep_hours": 6.0 + (i % 3),
+                "fast_food_meals_per_week": 1 + (i % 4),
+                "sugary_drinks_per_day": float(i % 3),
+                "family_history_obesity": i % 2,
+                "obesity": 0,
+            })
+        for i in range(40):
+            rows.append({
+                "age": 17 + (i % 3), "sex": "M" if i % 2 else "F",
+                "height_cm": 155.0 + (i % 10), "weight_kg": 85.0 + i,
+                "physical_activity_hours_per_week": float(i % 2),
+                "screen_time_hours_per_day": 8.0 + (i % 5),
+                "sleep_hours": 5.0 + (i % 2),
+                "fast_food_meals_per_week": 5 + (i % 3),
+                "sugary_drinks_per_day": 2.0 + (i % 2),
+                "family_history_obesity": 1,
+                "obesity": 1,
+            })
+
+        df = pd.DataFrame(rows)
+        with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
+            csv_path = Path(f.name)
+            df.to_csv(csv_path, index=False)
+        model_path = csv_path.with_suffix(".joblib")
+        try:
+            artifact = train(csv_path, model_path=model_path)
+            self.assertNotIn("height_cm", artifact["feature_columns"])
+            self.assertNotIn("weight_kg", artifact["feature_columns"])
+            self.assertNotIn("bmi", artifact["feature_columns"])
+            self.assertIn("physical_activity_hours_per_week", artifact["feature_columns"])
+            self.assertIn("bmi_screen_score", artifact["probability_blend_strategy"])
+        finally:
+            csv_path.unlink(missing_ok=True)
+            model_path.unlink(missing_ok=True)
+
+    def test_predict_probability_blends_lifestyle_model_with_bmi_screen_score(self):
+        import numpy as np
+        from unittest.mock import patch
+        from obesity_ml.predict import predict_probability
+
+        class FixedLifestyleModel:
+            def predict_proba(self, _frame):
+                return np.array([[0.8, 0.2]])
+
+        artifact = {
+            "model": FixedLifestyleModel(),
+            "base_model_name": "fixed_lifestyle_model",
+            "candidate_methods": [],
+            "used_smote": False,
+            "selection_rule": "",
+            "validation_strategy": "",
+            "resampling_strategy": "",
+            "dataset_warning": "",
+            "metrics": {},
+            "test_metrics": {},
+            "disclaimer": "Educational risk-estimation model only; not a medical diagnosis.",
+        }
+        input_data = {
+            "age": 16,
+            "sex": "M",
+            "height_cm": 200,
+            "weight_kg": 100,
+            "physical_activity_hours_per_week": 4,
+            "screen_time_hours_per_day": 4,
+            "sleep_hours": 7,
+            "fast_food_meals_per_week": 1,
+            "sugary_drinks_per_day": 0,
+            "family_history_obesity": 0,
+        }
+
+        with patch("obesity_ml.predict.load_artifact", return_value=artifact):
+            result = predict_probability(input_data)
+
+        self.assertEqual(result["lifestyle_probability"], 0.2)
+        self.assertEqual(result["bmi_screen_score"], 0.5)
+        self.assertEqual(result["obesity_probability"], 0.35)
+        self.assertIn("50% lifestyle", result["probability_blend_strategy"])
+
+    def test_cross_validated_evaluation_returns_real_roc_points(self):
+        import pandas as pd
+        from sklearn.linear_model import LogisticRegression
+        from obesity_ml.train import cross_validated_evaluation
+
+        x = pd.DataFrame({"signal": [-3, -2, -1, -0.5, 0.5, 1, 2, 3]})
+        y = pd.Series([0, 0, 0, 0, 1, 1, 1, 1])
+
+        metrics, curve = cross_validated_evaluation(LogisticRegression(), x, y)
+
+        self.assertIn("roc_auc", metrics)
+        self.assertIsNotNone(curve)
+        self.assertEqual(curve["false_positive_rate"][0], 0.0)
+        self.assertEqual(curve["true_positive_rate"][0], 0.0)
+        self.assertEqual(curve["false_positive_rate"][-1], 1.0)
+        self.assertEqual(curve["true_positive_rate"][-1], 1.0)
+        for point in curve["false_positive_rate"] + curve["true_positive_rate"]:
+            self.assertGreaterEqual(point, 0.0)
+            self.assertLessEqual(point, 1.0)
+
     def test_clamp_smotenc_k_neighbors_adjusts_to_fit_data_size(self):
         """RED for Bug 4: k_neighbors is computed from y_train but the model is
         fitted on y_fit (80% after calibration split). _clamp_smotenc_k_neighbors
@@ -199,9 +330,47 @@ class TrainingPipelineTests(unittest.TestCase):
             artifact = train(csv_path, model_path=model_path)
             self.assertIsNotNone(artifact)
             self.assertIn("model", artifact)
+            self.assertIn("roc_curves", artifact)
+            self.assertTrue(artifact["roc_curves"])
         finally:
             csv_path.unlink(missing_ok=True)
             model_path.unlink(missing_ok=True)
+
+
+class FormImportTests(unittest.TestCase):
+    def test_form1_current_long_headers_are_normalized(self):
+        import pandas as pd
+        from obesity_ml.form_import import normalize_google_form_frame
+
+        frame = pd.DataFrame(
+            [
+                {
+                    "ขออนุญาตนำข้อมูลไปใช้นะครับ": "อนุญาต",
+                    "เพศต้นกำเนิด": "ชาย",
+                    "ส่วนสูง (ไม่ต้องใส่หน่วย) เช่น 195": "180",
+                    "น้ำหนัก (ไม่ต้องใส่หน่วย) เช่น 80": "81",
+                    "อายุ (ไม่ต้องใส่หน่วย) เช่น 17": "17",
+                    "ออกกำลังกายเฉลี่ยกี่ชั่วโมงต่อสัปดาห์\nถ้าไม่แน่นอนให้ใส่ .5": "4",
+                    "ใช้หน้าจอเฉลี่ยวันละกี่ชั่วโมงต่อวัน\nถ้าไม่แน่นอนให้ใส่ .5": "6",
+                    "นอนเฉลี่ยกี่ชั่วโมงต่อวัน\nถ้าไม่แน่นอนให้ใส่ .5": "7",
+                    "กินอาหารไร้ประโยชน์เฉลี่ยกี่มื้อต่อสัปดาห์": "2",
+                    "กินน้ำหวานหรือน้ำอัดลมเฉลี่ยกี่ครั้งต่อวัน": "1",
+                    "มีคนในครอบครัวเป็นโรคอ้วนหรือไม่": "ไม่ใช่",
+                    "คุณคิดว่าคุณเป็นโรคอ้วนมั้ย": "ไม่เป็น",
+                }
+            ]
+        )
+
+        normalized = normalize_google_form_frame(frame)
+
+        self.assertEqual(len(normalized), 1)
+        row = normalized.iloc[0]
+        self.assertEqual(row["age"], 17)
+        self.assertEqual(row["height_cm"], 180)
+        self.assertEqual(row["weight_kg"], 81)
+        self.assertEqual(row["physical_activity_hours_per_week"], 4)
+        self.assertEqual(row["screen_time_hours_per_day"], 6)
+        self.assertEqual(row["sleep_hours"], 7)
 
 
 class BestModelReasonTests(unittest.TestCase):
@@ -231,6 +400,73 @@ class BestModelReasonTests(unittest.TestCase):
         self.assertNotIn("nan", reason.lower(), f"Reason must not contain 'nan': {reason}")
 
 
+class EvaluationDashboardTests(unittest.TestCase):
+    def setUp(self):
+        self.metrics = {
+            "random_forest": {
+                "roc_auc": 0.91,
+                "f1": 0.84,
+                "accuracy": 0.88,
+                "kappa": 0.75,
+                "sensitivity": 0.82,
+                "specificity": 0.90,
+            },
+            "naive_bayes_gaussian": {
+                "roc_auc": float("nan"),
+                "f1": 0.71,
+                "accuracy": 0.74,
+                "kappa": 0.48,
+                "sensitivity": 0.76,
+                "specificity": 0.72,
+            },
+        }
+
+    def test_selected_model_banner_uses_stored_metrics(self):
+        from obesity_ml.app import selected_model_banner_html
+
+        html = selected_model_banner_html("random_forest", self.metrics)
+
+        self.assertIn("Random Forest", html)
+        self.assertIn("ROC-AUC 0.91", html)
+        self.assertIn("F1 score 0.84", html)
+        self.assertIn("Selected for the current training data", html)
+
+    def test_metric_comparison_chart_includes_six_metrics_and_unavailable_values(self):
+        from obesity_ml.app import metric_comparison_chart_html
+
+        html = metric_comparison_chart_html(self.metrics)
+
+        for label in ("ROC-AUC", "F1 score", "Accuracy", "Kappa", "Sensitivity", "Specificity"):
+            self.assertIn(label, html)
+        self.assertIn("Not available", html)
+        self.assertNotIn("nan", html.lower())
+
+    def test_roc_curves_requires_real_stored_points(self):
+        from obesity_ml.app import roc_curves_html
+
+        html = roc_curves_html({}, self.metrics)
+
+        self.assertIn("ROC curves are available after retraining the models.", html)
+        self.assertNotIn('class="roc-model-curve"', html)
+
+    def test_roc_curves_renders_real_stored_points(self):
+        from obesity_ml.app import roc_curves_html
+
+        curves = {
+            "random_forest": {
+                "false_positive_rate": [0.0, 0.2, 1.0],
+                "true_positive_rate": [0.0, 0.8, 1.0],
+            }
+        }
+        html = roc_curves_html(curves, self.metrics)
+
+        self.assertIn('role="img"', html)
+        self.assertIn('class="roc-model-curve"', html)
+        self.assertIn("Random Forest", html)
+        self.assertIn("AUC 0.91", html)
+        self.assertNotIn("available after retraining", html)
+
+
 class RouteRegressionTests(unittest.TestCase):
     def _client(self):
         from fastapi.testclient import TestClient
@@ -243,11 +479,154 @@ class RouteRegressionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("O-Beast", response.text)
 
+    def test_premium_health_ui_contract_renders_on_home_and_predictor(self):
+        """Primary user pages should expose the approved premium-health journey."""
+        client = self._client()
+        home_response = client.get("/")
+        predictor_response = client.get("/predictor")
+
+        self.assertEqual(home_response.status_code, 200)
+        self.assertIn("Know your risk", home_response.text)
+        self.assertIn("premium-health-pattern.png", home_response.text)
+        self.assertIn("prefers-reduced-motion", home_response.text)
+
+        self.assertEqual(predictor_response.status_code, 200)
+        self.assertIn('class="form-step active"', predictor_response.text)
+        self.assertIn('data-step="2"', predictor_response.text)
+        self.assertIn('id="formProgress"', predictor_response.text)
+
+    def test_result_prioritizes_clear_actions(self):
+        """Result should give users practical next steps before research detail."""
+        response = self._client().post(
+            "/predict-form",
+            data={
+                "age": "16",
+                "sex": "M",
+                "height_cm": "170",
+                "weight_kg": "65",
+                "physical_activity_hours_per_week": "3",
+                "screen_time_hours_per_day": "5",
+                "sleep_hours": "7",
+                "fast_food_meals_per_week": "2",
+                "sugary_drinks_per_day": "1",
+                "family_history_obesity": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Three useful next steps", response.text)
+        self.assertIn("What this result means", response.text)
+
     def test_methods_page_renders(self):
         """GET /methods must return 200 and mention model-selection content."""
         response = self._client().get("/methods")
         self.assertEqual(response.status_code, 200)
         self.assertIn("How O-Beast Checks Results", response.text)
+        self.assertIn(".section-grid > * { min-width: 0; }", response.text)
+        self.assertIn("overflow-wrap: anywhere", response.text)
+        self.assertIn("Selected for the current training data", response.text)
+        self.assertNotIn("Library not loaded", response.text)
+
+    def test_methods_page_separates_smotenc_from_prediction_algorithms(self):
+        """SMOTENC prepares training data; it must not appear as a prediction algorithm."""
+        from obesity_ml.app import methods_html
+
+        response = self._client().get("/methods")
+        algorithm_html = methods_html()
+
+        self.assertNotIn("SMOTENC", algorithm_html)
+        self.assertIn("SMOTENC is not a prediction algorithm", response.text)
+        self.assertIn("Uneven groups", response.text)
+        self.assertIn("Balanced training data", response.text)
+        self.assertIn("Prediction algorithms learn", response.text)
+
+    def test_model_tournament_details_live_on_methods_page_not_result_page(self):
+        """Normal users should see a clean result page; detailed metrics belong on Methods."""
+        client = self._client()
+        result_response = client.post(
+            "/predict-form",
+            data={
+                "age": "16",
+                "sex": "M",
+                "height_cm": "170",
+                "weight_kg": "65",
+                "physical_activity_hours_per_week": "3",
+                "screen_time_hours_per_day": "5",
+                "sleep_hours": "7",
+                "fast_food_meals_per_week": "2",
+                "sugary_drinks_per_day": "1",
+                "family_history_obesity": "0",
+            },
+        )
+        methods_response = client.get("/methods")
+
+        self.assertEqual(result_response.status_code, 200)
+        self.assertNotIn("Model tournament scores", result_response.text)
+        self.assertNotIn('<table class="metric-table"', result_response.text)
+        self.assertEqual(methods_response.status_code, 200)
+        self.assertIn("Model tournament scores", methods_response.text)
+        self.assertIn('<table class="metric-table"', methods_response.text)
+        self.assertIn('class="evaluation-dashboard"', methods_response.text)
+        self.assertLess(
+            methods_response.text.index('class="metric-table"'),
+            methods_response.text.index('class="evaluation-dashboard"'),
+        )
+        self.assertIn("Selected for the current training data", methods_response.text)
+
+    def test_methods_page_explains_when_roc_curves_require_retraining(self):
+        from unittest.mock import patch
+
+        artifact = {
+            "base_model_name": "random_forest",
+            "metrics": {
+                "random_forest": {
+                    "roc_auc": 0.91,
+                    "f1": 0.84,
+                    "accuracy": 0.88,
+                    "kappa": 0.75,
+                    "sensitivity": 0.82,
+                    "specificity": 0.90,
+                }
+            },
+        }
+
+        with patch("obesity_ml.app.load_artifact", return_value=artifact):
+            response = self._client().get("/methods")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("ROC curves are available after retraining the models.", response.text)
+        self.assertNotIn('class="roc-model-curve"', response.text)
+
+    def test_methods_page_renders_real_stored_roc_curves(self):
+        from unittest.mock import patch
+
+        artifact = {
+            "base_model_name": "random_forest",
+            "metrics": {
+                "random_forest": {
+                    "roc_auc": 0.91,
+                    "f1": 0.84,
+                    "accuracy": 0.88,
+                    "kappa": 0.75,
+                    "sensitivity": 0.82,
+                    "specificity": 0.90,
+                }
+            },
+            "roc_curves": {
+                "random_forest": {
+                    "false_positive_rate": [0.0, 0.2, 1.0],
+                    "true_positive_rate": [0.0, 0.8, 1.0],
+                }
+            },
+        }
+
+        with patch("obesity_ml.app.load_artifact", return_value=artifact):
+            response = self._client().get("/methods")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('class="roc-model-curve"', response.text)
+        self.assertIn("Random Forest (AUC 0.91)", response.text)
+        self.assertNotIn("ROC curves are available after retraining the models.", response.text)
 
     def test_advice_get_renders_example_cards(self):
         """GET /advice must return 200 with at least one advice card."""
