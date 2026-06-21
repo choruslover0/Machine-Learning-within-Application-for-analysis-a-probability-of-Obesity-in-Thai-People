@@ -9,3 +9,11 @@ data/raw/
 data/processed/
 *.egg-info/
 .superpowers/
+
+# Local agent / tool caches and build output (not part of the project)
+.claude/
+.serena/
+.agents/
+graphify-out/
+build/
+skills-lock.json
