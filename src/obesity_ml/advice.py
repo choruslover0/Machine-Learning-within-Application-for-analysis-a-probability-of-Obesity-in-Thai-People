@@ -30,6 +30,16 @@ SOURCE_NOTES = [
         "url": "https://www.fao.org/nutrition/education/food-dietary-guidelines/regions/countries/Thailand/en/",
         "supports": "Thai-context food variety, vegetables, fruits, and moderation.",
     },
+    {
+        "name": "WHO alcohol fact sheet",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/alcohol",
+        "supports": "Reducing alcohol intake and related health risks.",
+    },
+    {
+        "name": "WHO tobacco fact sheet",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/tobacco",
+        "supports": "Tobacco harms; smoking is not a weight-control method.",
+    },
 ]
 
 
@@ -62,6 +72,7 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
     main_meals = float(row.get("main_meals_per_day", 3))         # NCP 1-4
     calorie_monitoring = float(row.get("calorie_monitoring", 0))  # SCC 0/1
     alcohol = float(row.get("alcohol_frequency", 0))             # CALC 0-3
+    transportation = str(row.get("transportation", "")).strip()  # MTRANS
     smoke = float(row.get("smoke", 0))                           # SMOKE 0/1
 
     cards = []
@@ -189,7 +200,7 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
                 "priority": "Nutrition",
                 "why": "Frequent alcohol adds calories and can affect sleep, appetite, and overall health.",
                 "action": "Reduce frequency step by step and replace some occasions with water or unsweetened drinks.",
-                "source": "WHO healthy diet guidance",
+                "source": "WHO alcohol fact sheet",
             }
         )
 
@@ -204,6 +215,17 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             }
         )
 
+    if transportation in {"Automobile", "Motorbike"}:
+        cards.append(
+            {
+                "title": "Add active travel where you can",
+                "priority": "Daily routine",
+                "why": "Your main transport is motorised, so daily routine adds little incidental movement.",
+                "action": "Where safe, swap short trips for walking or cycling, or add a walk before/after public transport.",
+                "source": "WHO physical activity and sedentary behaviour guidelines",
+            }
+        )
+
     if smoke >= 1:
         cards.append(
             {
@@ -211,7 +233,7 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
                 "priority": "Health safety",
                 "why": "Smoking is a major health risk and should not be treated as a weight-management strategy.",
                 "action": "If smoking is real in the answer, talk with a trusted adult or health professional about support.",
-                "source": "Public-health safety guidance",
+                "source": "WHO tobacco fact sheet",
             }
         )
 
