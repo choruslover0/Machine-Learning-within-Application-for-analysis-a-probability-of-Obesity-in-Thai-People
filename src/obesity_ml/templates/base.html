@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  {{ styles|safe }}
+  <script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+  <main>
+    <nav class="nav">
+      <div class="brand"><img class="brand-logo" src="/static/obeast-logo.png" alt="O-Beast logo">O-Beast</div>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/predictor">Predictor</a>
+        <a href="/advice">Advice</a>
+        <a href="/methods">Methods</a>
+      </div>
+    </nav>
+    {{ body|safe }}
+    <footer class="site-disclaimer note">
+      Trained on verified open-source data (UCI ObesityDataSet 2019: Colombia, Peru, Mexico),
+      not Thai-population data. Educational estimate only, not a medical diagnosis.
+    </footer>
+  </main>
+  {{ widget|safe }}
+</body>
+</html>

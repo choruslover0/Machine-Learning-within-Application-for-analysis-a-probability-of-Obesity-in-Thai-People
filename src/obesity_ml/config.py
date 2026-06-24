@@ -20,6 +20,7 @@ CHATBOT_MODEL_PATH = MODEL_DIR / "chatbot_model.joblib"
 
 TARGET_COLUMN = "obesity"
 
+# Body-screen features feed the separate BMI screen, never the lifestyle ML model.
 BODY_SCREEN_FEATURES = [
     "height_cm",
     "weight_kg",
@@ -34,50 +35,65 @@ BODY_SCREEN_FEATURES = [
 BMI_SCREEN_MIDPOINT = 25.0   # Asian-adult obesity threshold; screen score = 0.5 here
 BMI_SCREEN_STEEPNESS = 3.0   # logistic scale in BMI units (smaller = sharper step)
 
+# --- Pure UCI ObesityDataSet feature schema (Mendoza Palechor & de la Hoz, 2019) ---
+# Internal name (UCI column): semantics
+#   high_calorie_food_frequency (FAVC): 0/1 eats high-calorie food often
+#   vegetable_frequency         (FCVC): 1-3 vegetable intake
+#   main_meals_per_day          (NCP):  1-4 number of main meals
+#   food_between_meals_frequency(CAEC): 0-3 never..always snacking
+#   smoke                       (SMOKE):0/1
+#   water_daily                 (CH2O): 1-3 daily water (<1L / 1-2L / >2L)
+#   calorie_monitoring          (SCC):  0/1 monitors calories
+#   physical_activity_freq      (FAF):  0-3 physical-activity frequency
+#   screen_time_band            (TUE):  0-2 device-use band (0-2h / 3-5h / >5h)
+#   alcohol_frequency           (CALC): 0-3 never..always
+#   transportation              (MTRANS): categorical travel mode
 NUMERIC_FEATURES = [
     "age",
-    "physical_activity_hours_per_week",
-    "screen_time_hours_per_day",
-    "sleep_hours",
-    "fast_food_meals_per_week",
-    "sugary_drinks_per_day",
+    "physical_activity_freq",
+    "screen_time_band",
     "high_calorie_food_frequency",
     "vegetable_frequency",
     "main_meals_per_day",
     "food_between_meals_frequency",
     "smoke",
-    "physical_activity_missing",
-    "screen_time_missing",
-    "fast_food_missing",
-    "sugary_drinks_missing",
+    "water_daily",
+    "calorie_monitoring",
+    "alcohol_frequency",
 ]
 
 CATEGORICAL_FEATURES = [
     "sex",
     "family_history_obesity",
+    "transportation",
 ]
 
+# Every field the predictor form and /predict API must supply. The form now
+# collects the full UCI question set, so there are no defaulted lifestyle inputs.
 REQUIRED_INPUT_COLUMNS = [
     "age",
     "sex",
     "height_cm",
     "weight_kg",
-    "physical_activity_hours_per_week",
-    "screen_time_hours_per_day",
-    "sleep_hours",
-    "fast_food_meals_per_week",
-    "sugary_drinks_per_day",
     "family_history_obesity",
+    "high_calorie_food_frequency",
+    "vegetable_frequency",
+    "main_meals_per_day",
+    "food_between_meals_frequency",
+    "smoke",
+    "water_daily",
+    "calorie_monitoring",
+    "physical_activity_freq",
+    "screen_time_band",
+    "alcohol_frequency",
+    "transportation",
 ]
 
-OPTIONAL_INPUT_DEFAULTS = {
-    "high_calorie_food_frequency": 0.0,
-    "vegetable_frequency": 2.0,
-    "main_meals_per_day": 3.0,
-    "food_between_meals_frequency": 1.0,
-    "smoke": 0.0,
-    "physical_activity_missing": 0.0,
-    "screen_time_missing": 0.0,
-    "fast_food_missing": 0.0,
-    "sugary_drinks_missing": 0.0,
+# The form supplies every lifestyle input, so there are no numeric optionals.
+OPTIONAL_INPUT_DEFAULTS: dict[str, float] = {}
+
+# Safety default for the one categorical lifestyle feature, used only if a caller
+# omits it (the live form always sends it). OneHotEncoder ignores unknown levels.
+CATEGORICAL_OPTIONAL_DEFAULTS = {
+    "transportation": "Public_Transportation",
 }

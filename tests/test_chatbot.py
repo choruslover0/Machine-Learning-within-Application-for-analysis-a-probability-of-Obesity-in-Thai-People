@@ -183,9 +183,12 @@ class ChatbotResultContextTests(unittest.TestCase):
     def test_result_page_has_risk_tier_data_attribute(self):
         resp = self.client.post("/predict-form", data={
             "age": "16", "sex": "M", "height_cm": "170", "weight_kg": "90",
-            "physical_activity_hours_per_week": "1", "screen_time_hours_per_day": "8",
-            "sleep_hours": "5", "fast_food_meals_per_week": "5",
-            "sugary_drinks_per_day": "3", "family_history_obesity": "1",
+            "family_history_obesity": "1",
+            "high_calorie_food_frequency": "1", "vegetable_frequency": "2",
+            "main_meals_per_day": "3", "food_between_meals_frequency": "2",
+            "smoke": "0", "water_daily": "1", "calorie_monitoring": "0",
+            "physical_activity_freq": "1", "screen_time_band": "2",
+            "alcohol_frequency": "1", "transportation": "Automobile",
         })
         self.assertEqual(resp.status_code, 200)
         self.assertIn('data-risk-tier=', resp.text)

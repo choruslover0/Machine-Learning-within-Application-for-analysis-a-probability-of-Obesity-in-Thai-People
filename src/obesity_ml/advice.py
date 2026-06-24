@@ -13,17 +13,17 @@ SOURCE_NOTES = [
     {
         "name": "WHO guideline on sugars intake",
         "url": "https://www.who.int/publications/i/item/9789241549028",
-        "supports": "Reducing free-sugar and sugary-drink intake.",
+        "supports": "Reducing free-sugar and high-calorie food intake.",
+    },
+    {
+        "name": "WHO healthy diet fact sheet",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+        "supports": "Vegetables, water, meal patterns, and moderation.",
     },
     {
         "name": "CDC BMI and healthy weight",
         "url": "https://www.cdc.gov/bmi/",
         "supports": "BMI as a screening signal, not a diagnosis.",
-    },
-    {
-        "name": "CDC sleep and sleep health",
-        "url": "https://www.cdc.gov/sleep/",
-        "supports": "Sleep routine and sleep-duration guidance.",
     },
     {
         "name": "FAO summary of Thailand food-based dietary guidelines",
@@ -52,16 +52,17 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
     probability = float(prediction.get("obesity_probability", 0)) if prediction else 0
     probability_tier = classify_probability(probability)
     bmi_tier = asian_bmi_risk_tier(bmi)
-    activity = float(row["physical_activity_hours_per_week"])
-    screen_time = float(row["screen_time_hours_per_day"])
-    sleep = float(row["sleep_hours"])
-    sugary_drinks = float(row["sugary_drinks_per_day"])
-    fast_food = float(row["fast_food_meals_per_week"])
-    vegetables = float(row.get("vegetable_frequency", 2))
-    high_calorie = float(row.get("high_calorie_food_frequency", 0))
-    between_meals = float(row.get("food_between_meals_frequency", 1))
-    main_meals = float(row.get("main_meals_per_day", 3))
-    smoke = float(row.get("smoke", 0))
+
+    activity = float(row.get("physical_activity_freq", 1))       # FAF 0-3
+    screen_band = float(row.get("screen_time_band", 1))          # TUE 0-2
+    water = float(row.get("water_daily", 2))                     # CH2O 1-3
+    vegetables = float(row.get("vegetable_frequency", 2))        # FCVC 1-3
+    high_calorie = float(row.get("high_calorie_food_frequency", 0))  # FAVC 0/1
+    between_meals = float(row.get("food_between_meals_frequency", 1))  # CAEC 0-3
+    main_meals = float(row.get("main_meals_per_day", 3))         # NCP 1-4
+    calorie_monitoring = float(row.get("calorie_monitoring", 0))  # SCC 0/1
+    alcohol = float(row.get("alcohol_frequency", 0))             # CALC 0-3
+    smoke = float(row.get("smoke", 0))                           # SMOKE 0/1
 
     cards = []
     cards.append(
@@ -77,20 +78,20 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
     if activity < 1:
         cards.append(
             {
-                "title": "Start with very small movement goals",
+                "title": "Start with small movement goals",
                 "priority": "High impact habit",
-                "why": "Your activity answer is under 1 hour per week, so even small increases can improve the weekly pattern.",
-                "action": "Try 10 minutes of walking or sports practice on 4-5 days this week, then increase slowly.",
+                "why": "Your physical-activity answer is very low, so even small increases can improve the weekly pattern.",
+                "action": "Try 10 minutes of walking or sport on 3-4 days this week, then build up slowly.",
                 "source": "WHO physical activity guidelines",
             }
         )
-    elif activity < 2.5:
+    elif activity < 2:
         cards.append(
             {
-                "title": "Move more during the week",
+                "title": "Move a little more each week",
                 "priority": "High impact habit",
-                "why": "Your activity answer is below a common public-health target for adults and older teens.",
-                "action": "Add 15-20 minutes of moderate movement on 3 extra days, aiming toward 150 minutes per week when appropriate.",
+                "why": "Your activity answer is below a helpful weekly target for teens and adults.",
+                "action": "Add 15-20 minutes of moderate movement on a few extra days, aiming toward regular activity.",
                 "source": "WHO physical activity guidelines",
             }
         )
@@ -99,93 +100,41 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             {
                 "title": "Keep your activity habit",
                 "priority": "Protective habit",
-                "why": "Your weekly activity answer is already moving in a helpful direction.",
-                "action": "Keep a regular routine and add variety: walking, sports, cycling, dance, or strength exercises.",
+                "why": "Your activity answer is already moving in a helpful direction.",
+                "action": "Keep a regular routine with variety: walking, sport, cycling, dance, or strength work.",
                 "source": "WHO physical activity guidelines",
             }
         )
 
-    if screen_time >= 8:
+    if screen_band >= 2:
         cards.append(
             {
-                "title": "Reduce very long screen sessions",
+                "title": "Reduce very long device time",
                 "priority": "Daily routine",
-                "why": "Your answer suggests very long daily sedentary time, which can crowd out sleep and activity.",
-                "action": "Protect one screen-free block each day and take a 3-5 minute movement break after each study or gaming session.",
+                "why": "Your device-use answer is in the highest band, which usually means long sedentary time.",
+                "action": "Protect one screen-free block each day and take a short movement break after each long session.",
                 "source": "WHO sedentary behaviour guidance",
             }
         )
-    elif screen_time >= 6:
+    elif screen_band >= 1:
         cards.append(
             {
-                "title": "Break up long sitting time",
+                "title": "Break up sitting time",
                 "priority": "Daily routine",
-                "why": "High screen time usually means long sedentary periods, which public-health guidance recommends reducing.",
-                "action": "Use a simple rule: after 45-60 minutes of sitting, stand, stretch, walk, or do light movement for 3-5 minutes.",
+                "why": "Moderate device time still means long sitting periods that guidance recommends breaking up.",
+                "action": "After 45-60 minutes of sitting, stand, stretch, or walk for a few minutes.",
                 "source": "WHO sedentary behaviour guidance",
             }
         )
 
-    if sleep < 6:
+    if water < 2:
         cards.append(
             {
-                "title": "Protect sleep first",
-                "priority": "Recovery",
-                "why": "Your sleep answer is very short. Short sleep can make appetite, mood, school focus, and movement habits harder.",
-                "action": "Move bedtime earlier by 15-30 minutes for a week and reduce bright screen use close to bedtime.",
-                "source": "CDC sleep health",
-            }
-        )
-    elif sleep < 7:
-        cards.append(
-            {
-                "title": "Improve sleep consistency",
-                "priority": "Recovery",
-                "why": "Short sleep can make appetite, energy, and exercise habits harder to manage.",
-                "action": "Try a fixed sleep/wake time, reduce bright screens before bed, and avoid heavy late-night snacks or sugary drinks.",
-                "source": "CDC sleep health",
-            }
-        )
-
-    if sugary_drinks >= 2:
-        cards.append(
-            {
-                "title": "Cut sugary drinks in half first",
-                "priority": "Nutrition",
-                "why": "Two or more sweet drinks per day can add many extra calories and free sugars without strong fullness.",
-                "action": "For the first target, reduce by half and replace the removed drinks with water or unsweetened tea.",
-                "source": "WHO sugars guideline",
-            }
-        )
-    elif sugary_drinks >= 1:
-        cards.append(
-            {
-                "title": "Reduce sugary drinks step by step",
-                "priority": "Nutrition",
-                "why": "Sugary drinks are an easy source of free sugars because they do not make people feel full for long.",
-                "action": "Replace one sweet drink with water, unsweetened tea, or low-sugar options first; gradual change is easier to keep.",
-                "source": "WHO sugars guideline",
-            }
-        )
-
-    if fast_food >= 6:
-        cards.append(
-            {
-                "title": "Replace some frequent fast-food meals",
-                "priority": "Food pattern",
-                "why": "Fast-food frequency is high, so the first goal is reducing frequency rather than trying to be perfect.",
-                "action": "Swap 2 meals per week for a simple balanced meal: rice or grains, vegetables, lean protein, fruit, and water.",
-                "source": "Thailand food-based dietary guidance",
-            }
-        )
-    elif fast_food >= 3:
-        cards.append(
-            {
-                "title": "Make fast food less frequent",
-                "priority": "Food pattern",
-                "why": "Frequent fast-food meals can increase energy intake and make vegetables, fruits, and balanced meals harder to fit in.",
-                "action": "Plan a few Thai-style balanced meals around rice or grains, vegetables, lean protein, fruit, and less fried or sweet food.",
-                "source": "Thailand food-based dietary guidance",
+                "title": "Drink a little more water",
+                "priority": "Daily routine",
+                "why": "Your water answer is on the low side. Water is a calorie-free way to stay hydrated through the day.",
+                "action": "Aim for at least 1-2 litres daily and keep water nearby during study, sport, and meals.",
+                "source": "WHO healthy diet guidance",
             }
         )
 
@@ -194,9 +143,9 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             {
                 "title": "Watch frequent high-calorie food",
                 "priority": "Food choice",
-                "why": "Your second-form style answer says high-calorie food is frequent, which matches an important variable in obesity survey research.",
+                "why": "You reported frequent high-calorie food, an important variable in obesity survey research.",
                 "action": "Keep the food you enjoy, but reduce portion size or frequency and pair meals with vegetables or fruit.",
-                "source": "E3S obesity ML lifestyle-variable study",
+                "source": "WHO sugars guideline",
             }
         )
 
@@ -205,7 +154,7 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             {
                 "title": "Add vegetables to one meal first",
                 "priority": "Food balance",
-                "why": "Vegetable frequency is low. In the reference paper, vegetable intake was one of the useful lifestyle variables.",
+                "why": "Vegetable frequency is low. Vegetable intake is one of the useful lifestyle variables in the reference data.",
                 "action": "Add one vegetable serving to lunch or dinner before changing the whole diet.",
                 "source": "Thailand food-based dietary guidance",
             }
@@ -216,20 +165,42 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
             {
                 "title": "Plan snacks between meals",
                 "priority": "Eating pattern",
-                "why": "Frequent food between meals was one of the strongest variables in the reference obesity ML paper.",
-                "action": "Prepare planned snacks such as fruit, yogurt, or nuts, and avoid turning every break into a high-calorie snack.",
-                "source": "E3S obesity ML lifestyle-variable study",
+                "why": "Frequent food between meals was one of the strongest variables in obesity ML research.",
+                "action": "Prepare planned snacks such as fruit, yogurt, or nuts instead of turning every break into a high-calorie snack.",
+                "source": "WHO healthy diet guidance",
             }
         )
 
-    if main_meals > 4:
+    if main_meals > 3.5:
         cards.append(
             {
                 "title": "Check meal frequency",
                 "priority": "Eating pattern",
-                "why": "Your main-meal answer is unusually high, so the app flags it for review rather than treating it as automatically bad.",
-                "action": "Check whether this answer means true meals or snacks. For research data, this may need cleaning before training.",
-                "source": "Survey data quality check",
+                "why": "Your main-meal answer is high, so the app flags it for review rather than treating it as automatically bad.",
+                "action": "Check whether this means true meals or snacks, and keep meals balanced around grains, vegetables, and protein.",
+                "source": "WHO healthy diet guidance",
+            }
+        )
+
+    if alcohol >= 2:
+        cards.append(
+            {
+                "title": "Reduce frequent alcohol",
+                "priority": "Nutrition",
+                "why": "Frequent alcohol adds calories and can affect sleep, appetite, and overall health.",
+                "action": "Reduce frequency step by step and replace some occasions with water or unsweetened drinks.",
+                "source": "WHO healthy diet guidance",
+            }
+        )
+
+    if calorie_monitoring < 1:
+        cards.append(
+            {
+                "title": "Try light awareness of intake",
+                "priority": "Awareness",
+                "why": "You do not currently monitor calories. Light awareness, not strict counting, can help notice patterns.",
+                "action": "Notice portion sizes and sugary or fried items for a week, without aiming for a perfect diet.",
+                "source": "CDC healthy weight context",
             }
         )
 
@@ -250,7 +221,7 @@ def generate_advice(input_data: dict, prediction: dict | None = None) -> dict:
                 "title": "Use family history as an early-warning signal",
                 "priority": "Awareness",
                 "why": "Family history can reflect shared genes, food habits, activity patterns, and home environment.",
-                "action": "Track habits gently and consider discussing weight, blood pressure, or nutrition questions with a health professional.",
+                "action": "Track habits gently and consider discussing weight, blood pressure, or nutrition with a health professional.",
                 "source": "CDC healthy weight context",
             }
         )
