@@ -1012,9 +1012,16 @@ def predictor() -> str:
           <p>Family history and a few UCI-style context answers help the prototype match the training format.</p>
           <div class="field-grid">
             <label>Family history of obesity <select name="family_history_obesity"><option value="0">No</option><option value="1">Yes</option></select></label>
-            <label>Smoking <select name="smoke"><option value="0">No</option><option value="1">Yes</option></select></label>
+            <label>Do you smoke? (your own smoking, not people around you) <select name="smoke"><option value="0">No</option><option value="1">Yes</option></select></label>
             <label>Calorie monitoring <select name="calorie_monitoring"><option value="0">No</option><option value="1">Yes</option></select></label>
-            <label>Alcohol frequency, 0-3 <input name="alcohol_frequency" type="number" min="0" max="3" step="0.1" value="0" required></label>
+            <label>Alcohol frequency
+              <select name="alcohol_frequency">
+                <option value="0">No</option>
+                <option value="1">Sometimes</option>
+                <option value="2">Frequently</option>
+                <option value="3">Always</option>
+              </select>
+            </label>
           </div>
           <div class="step-actions"><button class="step-back" type="button" data-back>Previous</button><button type="button" data-next>Review answers</button></div>
         </section>
@@ -1067,7 +1074,7 @@ def predictor() -> str:
             water_daily:'Daily water',transportation:'Transportation',
             high_calorie_food_frequency:'High-calorie food',vegetable_frequency:'Vegetables',
             main_meals_per_day:'Main meals',food_between_meals_frequency:'Between-meal food',
-            family_history_obesity:'Family history',smoke:'Smoking',
+            family_history_obesity:'Family history',smoke:'Smoke (self)',
             calorie_monitoring:'Calorie monitoring',alcohol_frequency:'Alcohol frequency'
           }};
         review.innerHTML='';
