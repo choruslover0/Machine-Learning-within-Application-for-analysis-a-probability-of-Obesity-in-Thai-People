@@ -716,21 +716,25 @@ class RouteRegressionTests(unittest.TestCase):
 
 
 class RiskTierTests(unittest.TestCase):
-    def test_classify_probability_covers_all_five_tiers(self):
-        """Every tier boundary must resolve to the right key."""
+    def test_classify_probability_covers_all_seven_tiers(self):
+        """Every UCI-style tier boundary must resolve to the right key."""
         from obesity_ml.risk_tiers import classify_probability
 
         cases = [
-            (0.00, "very_low"),
-            (0.10, "very_low"),
-            (0.20, "low"),
-            (0.39, "low"),
-            (0.40, "moderate"),
-            (0.59, "moderate"),
-            (0.60, "high"),
-            (0.79, "high"),
-            (0.80, "very_high"),
-            (1.00, "very_high"),
+            (0.00, "insufficient_weight"),
+            (0.13, "insufficient_weight"),
+            (0.14, "normal_weight"),
+            (0.27, "normal_weight"),
+            (0.28, "overweight_level_i"),
+            (0.42, "overweight_level_i"),
+            (0.43, "overweight_level_ii"),
+            (0.56, "overweight_level_ii"),
+            (0.57, "obesity_type_i"),
+            (0.70, "obesity_type_i"),
+            (0.71, "obesity_type_ii"),
+            (0.85, "obesity_type_ii"),
+            (0.86, "obesity_type_iii"),
+            (1.00, "obesity_type_iii"),
         ]
         for prob, expected_key in cases:
             with self.subTest(prob=prob):
