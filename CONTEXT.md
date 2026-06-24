@@ -41,8 +41,8 @@ The final probability created by combining lifestyle ML probability and BMI scre
 _Avoid_: Raw model output, BMI-only result
 
 **Risk Tier**:
-One of five user-facing probability bands: very low, low, moderate, high, or very high.
-_Avoid_: Disease stage, clinical class
+One of seven user-facing risk-probability bands named after the UCI obesity levels: Insufficient Weight, Normal Weight, Overweight Level I, Overweight Level II, Obesity Type I, Obesity Type II, Obesity Type III. The label mirrors the UCI level name but reflects the model's risk probability, not a measured weight class.
+_Avoid_: Disease stage, clinical diagnosis, measured weight class
 
 **Wellness Advice**:
 Rule-based educational guidance generated from user answers, risk tier, and public-health references.

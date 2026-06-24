@@ -177,3 +177,15 @@ NCP, CAEC, SMOKE, CH2O, SCC, FAF, TUE, CALC, MTRANS plus age/sex/height/weight/
 family-history. height/weight/bmi remain excluded from the lifestyle model and
 feed only the BMI screen. A site-wide footer states the data is verified
 open-source data (Colombia/Peru/Mexico), not Thai-population data.
+
+## Risk tiers and advice (updated 2026-06-24)
+
+`risk_tiers.classify_probability` maps the blended risk probability into seven
+bands named after the UCI obesity levels (Insufficient_Weight -> Obesity_Type_III)
+at cut points 0.14 / 0.28 / 0.43 / 0.57 / 0.71 / 0.86. Each tier explanation
+states the label reflects risk probability, not a measured weight class.
+
+`advice.py` is a rule-based engine over the UCI features. References include WHO
+physical activity / sedentary behaviour, WHO sugars, WHO healthy diet, WHO
+alcohol, WHO tobacco, CDC BMI, and FAO Thailand dietary guidance. It emits an
+active-travel card when transportation (MTRANS) is motorised.
