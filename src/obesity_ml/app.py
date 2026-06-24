@@ -1,15 +1,22 @@
 from html import escape
 from pathlib import Path
-from typing import Literal, Optional
-
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
 
 from obesity_ml.advice import generate_advice
 from obesity_ml.features import validate_prediction_frame
 from obesity_ml.predict import load_artifact, predict_probability
+from obesity_ml.templating import render
+from obesity_ml.charts import (
+    best_model_reason,
+    evaluation_dashboard_html,
+    metric_bars_html,
+    metric_comparison_chart_html,
+    metric_table_html,
+    roc_curves_html,
+    selected_model_banner_html,
+)
 
 
 app = FastAPI(title="Obesity Probability ML App")
@@ -61,1320 +68,6 @@ METHODS = [
 ]
 
 
-STYLE = """
-<style>
-  :root {
-    --ink: #15151a;
-    --muted: #71717a;
-    --line: rgba(24, 24, 27, 0.12);
-    --surface: rgba(255, 255, 255, 0.84);
-    --hot: #e1306c;
-    --sun: #f77737;
-    --gold: #fcaf45;
-    --violet: #833ab4;
-    --blue: #405de6;
-  }
-
-  * { box-sizing: border-box; }
-
-  html { scroll-behavior: smooth; }
-
-  body {
-    margin: 0;
-    min-height: 100vh;
-    color: var(--ink);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background:
-      radial-gradient(circle at 16% 8%, rgba(252, 175, 69, 0.34), transparent 28%),
-      radial-gradient(circle at 92% 18%, rgba(225, 48, 108, 0.30), transparent 25%),
-      linear-gradient(135deg, #fff7ed 0%, #fff 38%, #f4f7fb 100%);
-  }
-
-  a { color: inherit; }
-
-  main {
-    width: min(1160px, calc(100vw - 32px));
-    margin: 0 auto;
-    padding: 28px 0 46px;
-    animation: pageIn 520ms ease-out both;
-  }
-
-  .nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 18px;
-    border: 1px solid var(--line);
-    border-radius: 24px;
-    padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.70);
-    backdrop-filter: blur(18px);
-  }
-
-  .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    font-weight: 1000;
-  }
-
-  .brand-logo {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    box-shadow: 0 8px 20px rgba(225, 48, 108, 0.22);
-  }
-
-  .nav-links {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .pill, .nav-links a {
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 8px 12px;
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 900;
-    background: rgba(255, 255, 255, 0.72);
-    text-decoration: none;
-    transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
-  }
-
-  .nav-links a:hover, .pill:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 28px rgba(21, 21, 26, 0.10);
-    background: rgba(255, 255, 255, 0.94);
-  }
-
-  .hero, .card, form {
-    border: 1px solid var(--line);
-    border-radius: 30px;
-    background: var(--surface);
-    box-shadow: 0 24px 70px rgba(21, 21, 26, 0.13);
-    backdrop-filter: blur(18px);
-    animation: cardIn 620ms ease-out both;
-  }
-
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
-    gap: 18px;
-    padding: 22px;
-    align-items: start;
-  }
-
-  .hero-copy {
-    padding: 14px;
-    align-self: start;
-    margin-top: 28px;
-  }
-
-  .kicker {
-    width: fit-content;
-    border-radius: 999px;
-    padding: 8px 12px;
-    color: white;
-    background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
-    font-size: 13px;
-    font-weight: 1000;
-  }
-
-  h1 {
-    margin: 16px 0 12px;
-    font-size: clamp(42px, 7vw, 86px);
-    line-height: 0.92;
-    letter-spacing: 0;
-  }
-
-  h2 {
-    margin: 0 0 12px;
-    font-size: 27px;
-    line-height: 1.05;
-  }
-
-  .lead {
-    max-width: 620px;
-    color: var(--muted);
-    font-size: 18px;
-  }
-
-  .actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 22px;
-  }
-
-  .button {
-    min-height: 48px;
-    display: inline-grid;
-    place-items: center;
-    border-radius: 17px;
-    padding: 0 18px;
-    color: white;
-    background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
-    box-shadow: 0 15px 35px rgba(225, 48, 108, 0.25);
-    font-weight: 1000;
-    text-decoration: none;
-    transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
-  }
-
-  .button:hover, button:hover {
-    transform: translateY(-2px) scale(1.01);
-    filter: saturate(1.1);
-  }
-
-  .button:active, button:active, .nav-links a:active {
-    transform: translateY(1px) scale(0.98);
-  }
-
-  .button.secondary {
-    color: var(--ink);
-    background: rgba(255, 255, 255, 0.76);
-    box-shadow: none;
-    border: 1px solid var(--line);
-  }
-
-  .action-form {
-    display: inline;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-    backdrop-filter: none;
-    animation: none;
-  }
-
-  .action-form button {
-    width: auto;
-    min-height: 48px;
-    margin-top: 0;
-    padding: 0 18px;
-  }
-
-  .phone-preview {
-    border-radius: 34px;
-    padding: 18px;
-    background: #141417;
-    color: white;
-    min-height: 430px;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.1);
-  }
-
-  .avatar {
-    width: 112px;
-    height: 112px;
-    border-radius: 50%;
-    padding: 5px;
-    margin: 10px auto 16px;
-    background: conic-gradient(from 220deg, var(--gold), var(--sun), var(--hot), var(--violet), var(--gold));
-  }
-
-  .avatar-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: white;
-    color: var(--ink);
-    font-size: 36px;
-    font-weight: 1000;
-  }
-
-  .beast-mark {
-    width: min(190px, 68vw);
-    aspect-ratio: 1;
-    display: block;
-    margin: 8px auto 16px;
-    border-radius: 34px;
-    box-shadow: 0 22px 52px rgba(225, 48, 108, 0.28);
-  }
-
-  .mini-stat {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin: 18px 0;
-  }
-
-  .mini-stat div {
-    border-radius: 16px;
-    padding: 12px 6px;
-    background: rgba(255,255,255,.1);
-    text-align: center;
-  }
-
-  .mini-stat strong { display: block; font-size: 21px; }
-  .mini-stat span { color: rgba(255,255,255,.68); font-size: 12px; }
-
-  .story {
-    display: grid;
-    grid-template-columns: 42px 1fr;
-    gap: 14px;
-    align-items: center;
-    border-radius: 18px;
-    padding: 10px;
-    background: rgba(255,255,255,.09);
-    margin-top: 9px;
-    transition: transform 180ms ease, background 180ms ease;
-  }
-
-  .story:hover { transform: translateX(4px); background: rgba(255,255,255,.14); }
-
-  .story > div:last-child {
-    display: flex;
-    align-items: baseline;
-    gap: 9px;
-    min-width: 0;
-    flex-wrap: wrap;
-  }
-
-  .story strong {
-    flex: 0 0 auto;
-  }
-
-  .story span {
-    color: rgba(255,255,255,.78);
-    line-height: 1.35;
-  }
-
-  .story-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-weight: 1000;
-    background: linear-gradient(135deg, var(--hot), var(--sun));
-  }
-
-  .section-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 18px;
-  }
-
-  .support-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .advice-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 18px;
-  }
-
-  .advice-card {
-    border: 1px solid rgba(225, 48, 108, 0.18);
-  }
-
-  .advice-card .pill {
-    display: inline-block;
-    margin-bottom: 12px;
-  }
-
-  .source-list {
-    display: grid;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .source-list a {
-    color: var(--blue);
-    font-weight: 900;
-  }
-
-  .producers-section {
-    margin-top: 22px;
-    padding: 4px 0 0;
-  }
-
-  .producer-heading {
-    display: flex;
-    justify-content: space-between;
-    gap: 18px;
-    align-items: end;
-    margin-bottom: 14px;
-  }
-
-  .producer-heading h2 {
-    margin: 0;
-    font-size: clamp(30px, 5vw, 52px);
-    line-height: 0.96;
-    letter-spacing: 0;
-  }
-
-  .producer-heading p {
-    max-width: 430px;
-    margin: 0;
-    color: var(--muted);
-    font-weight: 750;
-    line-height: 1.45;
-  }
-
-  .producer-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  .producer-card {
-    position: relative;
-    overflow: hidden;
-    min-height: 448px;
-    border: 1px solid rgba(225, 48, 108, 0.18);
-    border-radius: 26px;
-    background: rgba(255, 255, 255, 0.74);
-    box-shadow: 0 24px 70px rgba(21, 21, 26, 0.12);
-    transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
-  }
-
-  .producer-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(225, 48, 108, 0.30);
-    box-shadow: 0 34px 90px rgba(21, 21, 26, 0.18);
-  }
-
-  .producer-photo-wrap {
-    height: 292px;
-    overflow: hidden;
-    background: #f4f4f5;
-  }
-
-  .producer-photo {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 420ms ease;
-  }
-
-  .producer-card:hover .producer-photo {
-    transform: scale(1.04);
-  }
-
-  .photo-phawich {
-    object-position: center 28%;
-  }
-
-  .photo-watcharawee {
-    object-position: 72% 48%;
-  }
-
-  .photo-paphawin {
-    object-position: 53% 34%;
-  }
-
-  .producer-body {
-    padding: 16px;
-  }
-
-  .producer-body h3 {
-    margin: 0;
-    font-size: clamp(20px, 2.5vw, 28px);
-    line-height: 1.05;
-  }
-
-  .producer-body p {
-    margin: 8px 0 14px;
-    color: var(--muted);
-    font-weight: 850;
-  }
-
-  .contact-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .contact-link, .contact-slot {
-    min-height: 40px;
-    border-radius: 999px;
-    padding: 10px 12px;
-    font-size: 13px;
-    font-weight: 1000;
-    text-decoration: none;
-    line-height: 1;
-  }
-
-  .contact-link {
-    color: white;
-    background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
-    box-shadow: 0 14px 28px rgba(225, 48, 108, 0.20);
-  }
-
-  .contact-slot {
-    display: inline-flex;
-    align-items: center;
-    color: var(--muted);
-    border: 1px dashed rgba(113, 113, 122, 0.44);
-    background: rgba(255, 255, 255, 0.62);
-  }
-
-  .card {
-    padding: 18px;
-    transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
-  }
-
-  .card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 30px 80px rgba(21, 21, 26, 0.16);
-    border-color: rgba(225, 48, 108, 0.24);
-  }
-
-  .card p, .note {
-    color: var(--muted);
-    line-height: 1.5;
-  }
-
-  .method-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .method {
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 13px;
-    background: rgba(255, 255, 255, 0.70);
-    transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
-  }
-
-  .method:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.94);
-    border-color: rgba(225, 48, 108, 0.22);
-  }
-
-  .method strong { display: block; margin-bottom: 5px; }
-  .method span { color: var(--muted); font-size: 13px; line-height: 1.35; }
-
-  .preparation-block {
-    margin: 26px 0;
-    padding: 20px 0 24px;
-    border-top: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-  }
-
-  .preparation-heading, .algorithm-heading {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 18px;
-    margin-bottom: 16px;
-  }
-
-  .preparation-heading h2, .algorithm-heading h2 { margin: 0; }
-
-  .preparation-heading p, .algorithm-heading p {
-    max-width: 520px;
-    margin: 0;
-    color: var(--muted);
-    line-height: 1.5;
-  }
-
-  .preparation-flow {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr) 52px minmax(0, 1fr);
-    gap: 10px;
-    align-items: center;
-  }
-
-  .preparation-step {
-    min-height: 124px;
-    display: grid;
-    align-content: center;
-    gap: 7px;
-    padding: 16px;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.72);
-  }
-
-  .preparation-step strong { font-size: 18px; }
-
-  .preparation-step span {
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.4;
-  }
-
-  .preparation-icon {
-    width: 38px;
-    height: 38px;
-    display: grid;
-    place-items: center;
-    border-radius: 12px;
-    color: white;
-    background: var(--forest, var(--violet));
-    font-weight: 1000;
-  }
-
-  .preparation-arrow {
-    color: var(--green, var(--violet));
-    font-size: 25px;
-    font-weight: 1000;
-    text-align: center;
-  }
-
-  .predict-layout {
-    display: grid;
-    grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
-    gap: 22px;
-    align-items: start;
-  }
-
-  .profile {
-    position: sticky;
-    top: 24px;
-    padding: 22px;
-  }
-
-  form { padding: 22px; }
-
-  .form-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 18px;
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  label {
-    display: grid;
-    gap: 8px;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 13px;
-    background: rgba(255, 255, 255, 0.72);
-    color: #3f3f46;
-    font-size: 13px;
-    font-weight: 900;
-  }
-
-  input, select {
-    width: 100%;
-    min-height: 42px;
-    border: 0;
-    border-radius: 12px;
-    padding: 8px 10px;
-    color: var(--ink);
-    background: #f4f4f5;
-    font: inherit;
-    font-size: 16px;
-    outline: none;
-  }
-
-  input:focus, select:focus {
-    box-shadow: 0 0 0 3px rgba(225, 48, 108, 0.18);
-    background: #fff;
-  }
-
-  button {
-    width: 100%;
-    min-height: 52px;
-    margin-top: 18px;
-    border: 0;
-    border-radius: 18px;
-    color: white;
-    background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
-    box-shadow: 0 15px 35px rgba(225, 48, 108, 0.25);
-    font: inherit;
-    font-size: 16px;
-    font-weight: 1000;
-    cursor: pointer;
-    transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
-  }
-
-  .ring {
-    width: 220px;
-    height: 220px;
-    margin: 0 auto 22px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background:
-      radial-gradient(circle closest-side, #fff 72%, transparent 73%),
-      conic-gradient(#e1306c var(--percent), #ede9e4 0);
-    box-shadow: inset 0 0 0 1px rgba(24, 24, 27, 0.08);
-  }
-
-  .prob {
-    font-size: 48px;
-    font-weight: 1000;
-  }
-
-  .feed-output {
-    margin-top: 16px;
-    border: 1px solid var(--line);
-    border-radius: 22px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.72);
-  }
-
-  .feed-output[hidden] {
-    display: none;
-  }
-
-  .feed-output .ring {
-    width: 154px;
-    height: 154px;
-    margin-bottom: 12px;
-  }
-
-  .feed-output .prob {
-    font-size: 34px;
-  }
-
-  .feed-meta {
-    display: grid;
-    gap: 7px;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.35;
-  }
-
-  .result-card {
-    width: min(560px, 100%);
-    margin: 88px auto 34px;
-    padding: 24px;
-    text-align: center;
-  }
-
-  .result-card .ring {
-    margin: 28px auto 24px;
-  }
-
-  .band {
-    width: fit-content;
-    margin: 24px auto 26px;
-    border-radius: 999px;
-    padding: 9px 14px;
-    color: white;
-    background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
-    font-weight: 1000;
-  }
-
-
-
-  .algorithm-lab {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 18px;
-  }
-
-  .research-map {
-    display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
-    gap: 18px;
-    align-items: center;
-    margin-top: 18px;
-    padding: 18px;
-    border: 1px solid rgba(225, 48, 108, 0.18);
-    border-radius: 26px;
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.54)),
-      radial-gradient(circle at 88% 12%, rgba(64, 93, 230, 0.16), transparent 30%);
-    overflow: hidden;
-  }
-
-  .pipeline-stack {
-    display: grid;
-    gap: 12px;
-  }
-
-  .pipeline-step {
-    display: grid;
-    grid-template-columns: 42px 1fr;
-    gap: 12px;
-    align-items: center;
-    min-height: 74px;
-    padding: 13px;
-    border: 1px solid var(--line);
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.74);
-    box-shadow: 0 18px 34px rgba(21, 21, 26, 0.09);
-    transform: perspective(900px) rotateX(3deg) rotateY(-5deg);
-  }
-
-  .pipeline-step span {
-    display: grid;
-    place-items: center;
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-    color: white;
-    background: linear-gradient(135deg, var(--violet), var(--hot), var(--sun));
-    font-weight: 1000;
-    box-shadow: 0 12px 24px rgba(225, 48, 108, 0.24);
-  }
-
-  .pipeline-step strong {
-    display: block;
-    font-size: 16px;
-    line-height: 1.15;
-  }
-
-  .pipeline-step small {
-    display: block;
-    margin-top: 4px;
-    color: var(--muted);
-    font-weight: 750;
-    line-height: 1.35;
-  }
-
-  .cube-scene {
-    min-height: 318px;
-    display: grid;
-    place-items: center;
-    position: relative;
-    perspective: 900px;
-  }
-
-  .cube-title {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    text-align: center;
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 1000;
-  }
-
-  .cube-legend {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 4px;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .cube-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 7px 9px;
-    color: var(--muted);
-    background: rgba(255, 255, 255, 0.88);
-    font-size: 11px;
-    font-weight: 1000;
-    box-shadow: 0 12px 24px rgba(21, 21, 26, 0.08);
-  }
-
-  .cube-legend i {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--blue);
-  }
-
-  .cube-legend span:last-child i {
-    background: var(--hot);
-  }
-
-  .cube-box {
-    position: relative;
-    width: min(280px, 84vw);
-    height: 230px;
-    transform-style: preserve-3d;
-    transform: rotateX(60deg) rotateZ(-38deg);
-    animation: cubeDrift 4.5s ease-in-out infinite alternate;
-  }
-
-  .cube-face {
-    position: absolute;
-    border: 1px solid rgba(24, 24, 27, 0.12);
-    background: rgba(255, 255, 255, 0.36);
-    box-shadow: inset 0 0 32px rgba(64, 93, 230, 0.08);
-  }
-
-  .cube-floor {
-    inset: 38px 20px 20px;
-    border-radius: 20px;
-  }
-
-  .cube-back {
-    left: 20px;
-    top: 18px;
-    width: calc(100% - 40px);
-    height: 112px;
-    transform: rotateX(72deg) translateY(-86px);
-    transform-origin: top;
-    border-radius: 18px;
-  }
-
-  .cube-side {
-    right: 20px;
-    top: 38px;
-    width: 112px;
-    height: calc(100% - 58px);
-    transform: rotateY(72deg) translateX(86px);
-    transform-origin: right;
-    border-radius: 18px;
-  }
-
-  .decision-sheet {
-    position: absolute;
-    left: 92px;
-    top: 44px;
-    width: 106px;
-    height: 150px;
-    border: 2px solid rgba(225, 48, 108, 0.56);
-    border-radius: 18px;
-    background: linear-gradient(135deg, rgba(225, 48, 108, 0.18), rgba(252, 175, 69, 0.08));
-    transform: rotateY(65deg) rotateZ(6deg);
-    box-shadow: 0 18px 38px rgba(225, 48, 108, 0.12);
-  }
-
-  .cube-point {
-    position: absolute;
-    z-index: 3;
-    width: 13px;
-    height: 13px;
-    border-radius: 50%;
-    background: var(--blue);
-    box-shadow: 0 0 0 5px rgba(64, 93, 230, 0.14), 0 16px 18px rgba(21, 21, 26, 0.18);
-  }
-
-  .cube-point.hot {
-    background: var(--hot);
-    box-shadow: 0 0 0 5px rgba(225, 48, 108, 0.14), 0 16px 18px rgba(21, 21, 26, 0.18);
-  }
-
-  .cube-point.synthetic {
-    background: #22c55e;
-    box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.16), 0 16px 18px rgba(21, 21, 26, 0.18);
-  }
-
-  .algo-card {
-    min-height: 316px;
-    overflow: hidden;
-  }
-
-  .algo-visual {
-    height: 154px;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background:
-      linear-gradient(90deg, rgba(24,24,27,.06) 1px, transparent 1px) 0 0 / 28px 28px,
-      linear-gradient(0deg, rgba(24,24,27,.06) 1px, transparent 1px) 0 0 / 28px 28px,
-      rgba(255, 255, 255, 0.76);
-    margin-bottom: 12px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .algo-visual::before {
-    content: "";
-    position: absolute;
-    inset: 14px;
-    border-left: 2px solid rgba(24,24,27,.16);
-    border-bottom: 2px solid rgba(24,24,27,.16);
-    pointer-events: none;
-  }
-
-  .logistic-svg {
-    position: absolute;
-    inset: 8px;
-    width: calc(100% - 16px);
-    height: calc(100% - 16px);
-    z-index: 1;
-  }
-
-  .logistic-svg text {
-    font-family: inherit;
-    font-weight: 900;
-    fill: var(--muted);
-  }
-
-  .viz-chip {
-    position: absolute;
-    z-index: 2;
-    border-radius: 999px;
-    padding: 5px 8px;
-    color: var(--ink);
-    background: rgba(255, 255, 255, 0.90);
-    border: 1px solid var(--line);
-    font-size: 11px;
-    font-weight: 1000;
-    box-shadow: 0 8px 18px rgba(21, 21, 26, 0.08);
-  }
-
-  .viz-chip.hot {
-    color: white;
-    border: 0;
-    background: linear-gradient(135deg, var(--hot), var(--sun));
-  }
-
-  .viz-chip.cool {
-    color: white;
-    border: 0;
-    background: linear-gradient(135deg, var(--blue), var(--violet));
-  }
-
-  .viz-arrow {
-    position: absolute;
-    z-index: 1;
-    height: 2px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--violet), var(--hot), var(--sun));
-    transform-origin: left center;
-    opacity: 0.58;
-    box-shadow: none;
-  }
-
-  .viz-arrow::after {
-    content: "";
-    position: absolute;
-    right: -1px;
-    top: 50%;
-    width: 7px;
-    height: 7px;
-    border-top: 2px solid var(--sun);
-    border-right: 2px solid var(--sun);
-    transform: translateY(-50%) rotate(45deg);
-    display: none;
-  }
-
-  .flow-step {
-    position: absolute;
-    display: grid;
-    place-items: center;
-    width: 42px;
-    height: 42px;
-    border-radius: 13px;
-    color: white;
-    background: linear-gradient(135deg, var(--violet), var(--hot));
-    font-size: 12px;
-    font-weight: 1000;
-    box-shadow: 0 12px 28px rgba(225, 48, 108, 0.20);
-    animation: nodePop 2.2s ease-in-out infinite;
-  }
-
-  .algo-points {
-    display: grid;
-    gap: 7px;
-    margin-top: 12px;
-  }
-
-  .algo-point {
-    display: grid;
-    grid-template-columns: 22px 1fr;
-    gap: 8px;
-    align-items: start;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.35;
-  }
-
-  .algo-point strong {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    color: white;
-    background: linear-gradient(135deg, var(--hot), var(--sun));
-    font-size: 11px;
-  }
-
-  .dot {
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--hot);
-    box-shadow: 0 0 0 4px rgba(225, 48, 108, 0.14);
-    animation: dotPulse 1.9s ease-in-out infinite;
-  }
-
-  .dot.ghost {
-    width: 10px;
-    height: 10px;
-    background: #22c55e;
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
-    opacity: 0.92;
-  }
-
-  .dot.alt {
-    background: var(--blue);
-    box-shadow: 0 0 0 4px rgba(64, 93, 230, 0.14);
-    animation-delay: 260ms;
-  }
-
-  .line-viz {
-    position: absolute;
-    left: 12%;
-    right: 12%;
-    top: 50%;
-    height: 4px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--violet), var(--hot), var(--sun));
-    transform: rotate(-14deg);
-    animation: scanLine 2.4s ease-in-out infinite alternate;
-  }
-
-  .line-viz.vertical {
-    width: 4px;
-    height: 112px;
-    left: 50%;
-    right: auto;
-    top: 18px;
-    transform: rotate(12deg);
-  }
-
-  .tree-viz {
-    position: absolute;
-    inset: 16px;
-    background:
-      linear-gradient(var(--hot), var(--hot)) 50% 16px / 3px 32px no-repeat,
-      linear-gradient(135deg, transparent 47%, var(--sun) 48%, var(--sun) 52%, transparent 53%) 50% 42px / 110px 34px no-repeat,
-      linear-gradient(45deg, transparent 47%, var(--blue) 48%, var(--blue) 52%, transparent 53%) 50% 42px / 110px 34px no-repeat;
-  }
-
-  .node {
-    position: absolute;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    color: white;
-    font-size: 11px;
-    font-weight: 1000;
-    background: linear-gradient(135deg, var(--violet), var(--hot));
-    animation: nodePop 2.2s ease-in-out infinite;
-  }
-
-  .bars {
-    display: grid;
-    gap: 8px;
-    margin-top: 24px;
-  }
-
-  .bar-row {
-    display: grid;
-    grid-template-columns: minmax(210px, 0.42fr) minmax(150px, 1fr) 52px;
-    gap: 12px;
-    align-items: center;
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 800;
-  }
-
-  .bar-row span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-    line-height: 1.15;
-  }
-
-  .bar-track {
-    height: 12px;
-    border-radius: 999px;
-    background: #eceff3;
-    overflow: hidden;
-  }
-
-  .bar-fill {
-    width: var(--score);
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--violet), var(--hot), var(--sun));
-    animation: growBar 900ms ease-out both;
-  }
-
-  .reason-box {
-    border: 1px solid rgba(225, 48, 108, 0.22);
-    border-radius: 22px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.80);
-    text-align: left;
-  }
-
-  .reason-box p {
-    margin: 0 0 16px;
-  }
-
-  .reason-box p:last-child {
-    margin-bottom: 0;
-  }
-
-  .table-wrapper {
-    margin-top: 12px;
-    width: 100%;
-    max-width: 100%;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.72);
-  }
-
-  .metric-table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-    color: var(--muted);
-    font-size: clamp(10px, 1.7vw, 13px);
-    text-align: left;
-  }
-
-  .metric-table th, .metric-table td {
-    padding: 12px 10px;
-    border-bottom: 1px solid var(--line);
-    vertical-align: middle;
-  }
-
-  .metric-table tr:last-child td {
-    border-bottom: none;
-  }
-
-  .metric-table th {
-    background: rgba(255, 255, 255, 0.78);
-    font-weight: 900;
-    color: var(--ink);
-    padding: 14px 10px;
-    white-space: nowrap;
-  }
-
-  .metric-table abbr {
-    text-decoration: none;
-    cursor: help;
-  }
-
-  .metric-table td:first-child {
-    font-weight: 600;
-    color: var(--ink);
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
-  .metric-table th:not(:first-child),
-  .metric-table td:not(:first-child) {
-    text-align: center;
-  }
-
-  .metric-table col:first-child {
-    width: 42%;
-  }
-
-  .metric-table col:not(:first-child) {
-    width: 14.5%;
-  }
-
-  @media (max-width: 640px) {
-    .metric-table th, .metric-table td {
-      padding: 10px 6px;
-    }
-
-    .metric-table {
-      font-size: 10px;
-    }
-  }
-
-  @keyframes pageIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes cardIn {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes dotPulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.24); }
-  }
-
-  @keyframes scanLine {
-    from { transform: rotate(-18deg) translateX(-8px); }
-    to { transform: rotate(-8deg) translateX(8px); }
-  }
-
-  @keyframes nodePop {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.12); }
-  }
-
-  @keyframes growBar {
-    from { width: 0; }
-    to { width: var(--score); }
-  }
-
-  @keyframes cubeDrift {
-    from { transform: rotateX(60deg) rotateZ(-38deg) translate3d(-2px, 0, 0); }
-    to { transform: rotateX(57deg) rotateZ(-34deg) translate3d(8px, -4px, 0); }
-  }
-
-  @property --percent {
-    syntax: '<percentage>';
-    inherits: false;
-    initial-value: 0%;
-  }
-
-  .ring {
-    transition: --percent 1100ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  @keyframes bandIn {
-    from { opacity: 0; transform: scale(0.72) translateY(6px); }
-    to   { opacity: 1; transform: scale(1)    translateY(0);   }
-  }
-
-  .result-card .band {
-    animation: bandIn 480ms cubic-bezier(0.34, 1.56, 0.64, 1) 860ms both;
-  }
-
-  @media (max-width: 920px) {
-    .hero, .predict-layout, .section-grid, .algorithm-lab, .advice-grid, .research-map, .producer-grid { grid-template-columns: 1fr; }
-    .producer-heading { display: block; }
-    .producer-heading p { margin-top: 10px; }
-    .profile { position: static; }
-  }
-
-  @media (max-width: 640px) {
-    main { width: min(100vw - 18px, 1160px); padding-top: 12px; }
-    .grid, .method-grid { grid-template-columns: 1fr; }
-    .preparation-heading, .algorithm-heading { display: grid; }
-    .preparation-flow { grid-template-columns: 1fr; }
-    .preparation-arrow { transform: rotate(90deg); }
-    .hero, .card, form { border-radius: 22px; padding: 16px; }
-    h1 { font-size: 42px; }
-    .bar-row { grid-template-columns: 1fr; gap: 5px; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: 1ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 1ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
-</style>
-"""
 
 CHAT_WIDGET_STYLE = """
 <style>
@@ -1491,1135 +184,7 @@ CHAT_WIDGET_STYLE = """
 """
 
 
-CYBERPUNK_OVERRIDE = """
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=DM+Sans:ital,opsz,wght@0,9..40,100..700;1,9..40,100..700&display=swap" rel="stylesheet">
-<style>
-  /* ── REFINED SOFT MODERN THEME ─────────────────────────────── */
-  :root {
-    --ink:     #1c1c2e;
-    --muted:   #6b6880;
-    --line:    rgba(0,0,0,0.08);
-    --surface: rgba(255,255,255,0.97);
-    --hot:     #db2777;
-    --sun:     #f59e0b;
-    --gold:    #f59e0b;
-    --violet:  #7c3aed;
-    --blue:    #3b82f6;
-    --grad-primary: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
-  }
 
-  /* ── BACKGROUND: brand-tinted neutral, no cream ─────────────── */
-  body {
-    color: var(--ink);
-    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-    background: oklch(97.5% 0.005 280);
-    min-height: 100vh;
-  }
-
-  body::before {
-    display: block !important;
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    background:
-      radial-gradient(ellipse 80% 60% at 8% 0%,    oklch(82% 0.10 300 / 0.18), transparent 55%),
-      radial-gradient(ellipse 55% 45% at 95% 8%,   oklch(76% 0.13 350 / 0.14), transparent 45%),
-      radial-gradient(ellipse 45% 30% at 55% 100%, oklch(88% 0.07 255 / 0.10), transparent 50%),
-      oklch(97.5% 0.005 280);
-    pointer-events: none;
-  }
-
-  h1, h2, h3, .brand { font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif; }
-
-  h1 { color: #1c1c2e; letter-spacing: -0.03em; }
-  h2 { color: #1c1c2e; letter-spacing: -0.01em; }
-
-  /* ── NAV ───────────────────────────────────────────────────── */
-  .nav {
-    background: oklch(100% 0 0 / 0.86);
-    border-color: rgba(0,0,0,0.06);
-    box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.05);
-    backdrop-filter: blur(24px) saturate(180%);
-  }
-
-  .brand { color: #1c1c2e; letter-spacing: -0.02em; }
-  .brand-logo { border-radius: 12px; box-shadow: 0 4px 14px oklch(52% 0.22 300 / 0.22); }
-
-  .pill, .nav-links a {
-    background: rgba(255,255,255,0.90);
-    border-color: rgba(0,0,0,0.08);
-    color: var(--muted);
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 600;
-    letter-spacing: 0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  }
-
-  .nav-links a:hover, .pill:hover {
-    background: #fff;
-    color: var(--ink);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.09);
-    transform: translateY(-2px);
-  }
-
-  /* ── CARDS ─────────────────────────────────────────────────── */
-  .hero, .card, form {
-    background: oklch(100% 0 0 / 0.97);
-    border-color: rgba(0,0,0,0.06);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.8), 0 4px 32px rgba(0,0,0,0.06), 0 12px 48px rgba(0,0,0,0.04);
-    backdrop-filter: none;
-    border-radius: 28px;
-  }
-
-  .card:hover {
-    border-color: oklch(52% 0.22 300 / 0.16);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.9), 0 8px 48px rgba(0,0,0,0.09), 0 0 0 1px oklch(52% 0.22 300 / 0.06);
-    transform: translateY(-3px);
-  }
-
-  /* Kicker: solid violet tint, not gradient fill */
-  .kicker {
-    background: oklch(94% 0.04 280);
-    border: 1px solid oklch(87% 0.07 280);
-    color: #4c1d95;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-  }
-
-  .lead { color: var(--muted); }
-  .card p, .note { color: var(--muted); }
-
-  /* ── BUTTONS ───────────────────────────────────────────────── */
-  .button {
-    background: var(--grad-primary);
-    border: none;
-    color: #fff;
-    box-shadow: 0 4px 20px oklch(52% 0.22 300 / 0.36);
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    border-radius: 16px;
-    transition: box-shadow 200ms ease, filter 200ms ease, transform 160ms ease;
-  }
-
-  .button:hover { box-shadow: 0 6px 32px oklch(52% 0.22 300 / 0.52); filter: brightness(1.06); }
-
-  .button.secondary {
-    background: rgba(255,255,255,0.95);
-    border: 1px solid rgba(0,0,0,0.10);
-    color: #1c1c2e;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  }
-  .button.secondary:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10); filter: none; }
-
-  button {
-    background: var(--grad-primary);
-    border: none;
-    color: #fff;
-    box-shadow: 0 4px 20px oklch(52% 0.22 300 / 0.33);
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    border-radius: 16px;
-  }
-
-  button:hover { box-shadow: 0 6px 28px oklch(52% 0.22 300 / 0.48); filter: brightness(1.06); }
-
-  .action-form button {
-    background: var(--grad-primary);
-    border: none;
-    color: #fff;
-    box-shadow: 0 4px 18px oklch(52% 0.22 300 / 0.30);
-    border-radius: 16px;
-  }
-
-  /* ── FORM ──────────────────────────────────────────────────── */
-  label {
-    background: oklch(98% 0.005 280);
-    border-color: rgba(0,0,0,0.07);
-    color: #1c1c2e;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    border-radius: 18px;
-  }
-
-  input, select {
-    background: oklch(96.5% 0.005 280);
-    color: #1c1c2e;
-    border: 1px solid rgba(0,0,0,0.08);
-    font-family: 'DM Sans', sans-serif;
-    border-radius: 12px;
-  }
-
-  input::placeholder { color: oklch(68% 0.02 280); }
-
-  input:focus, select:focus {
-    background: #fff;
-    border-color: oklch(52% 0.22 300 / 0.40);
-    box-shadow: 0 0 0 3px oklch(52% 0.22 300 / 0.15), 0 2px 8px rgba(0,0,0,0.05);
-  }
-
-  /* ── SVG RING ──────────────────────────────────────────────── */
-  .ring-wrap {
-    position: relative;
-    width: 220px;
-    height: 220px;
-    margin: 28px auto 24px;
-  }
-
-  .ring-svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-  }
-
-  .ring-bg-circle {
-    fill: none;
-    stroke: oklch(92% 0.03 280);
-    stroke-width: 18;
-  }
-
-  .ring-arc {
-    fill: none;
-    stroke: url(#arcGradient);
-    stroke-width: 18;
-    stroke-linecap: round;
-    filter: drop-shadow(0 4px 16px oklch(52% 0.22 300 / 0.45));
-  }
-
-  .ring-inner {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-  }
-
-  .prob {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 46px;
-    font-weight: 800;
-    color: #1c1c2e;
-    text-shadow: none;
-    letter-spacing: -0.04em;
-  }
-
-  /* ── TIER BAND ─────────────────────────────────────────────── */
-  .band {
-    background: var(--grad-primary);
-    border: none;
-    color: #fff;
-    box-shadow: 0 4px 20px oklch(52% 0.22 300 / 0.36);
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    font-size: 14px;
-    border-radius: 999px;
-  }
-
-  /* ── DATA VISUALS ───────────────────────────────────────────── */
-  .bar-track { background: oklch(93% 0.02 280); border-radius: 999px; }
-  .bar-fill  { background: var(--grad-primary); box-shadow: none; }
-  .bar-row   { color: var(--muted); }
-
-  .reason-box {
-    background: oklch(98% 0.008 280);
-    border-color: oklch(52% 0.22 300 / 0.12);
-    border-radius: 22px;
-  }
-
-  .method {
-    background: rgba(255,255,255,0.92);
-    border-color: rgba(0,0,0,0.07);
-    border-radius: 18px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-  }
-  .method:hover { background: #fff; border-color: oklch(52% 0.22 300 / 0.20); box-shadow: 0 4px 18px rgba(0,0,0,0.08); }
-  .method strong { color: var(--violet); font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 13px; }
-
-  .table-wrapper { background: rgba(255,255,255,0.96); border-color: rgba(0,0,0,0.07); border-radius: 20px; }
-  .metric-table th { background: oklch(97% 0.01 280); color: var(--violet); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
-  .metric-table th, .metric-table td { border-bottom-color: rgba(0,0,0,0.06); }
-  .metric-table td:first-child { color: #1c1c2e; }
-
-  .pipeline-step { background: rgba(255,255,255,0.95); border-color: rgba(0,0,0,0.07); box-shadow: 0 2px 16px rgba(0,0,0,0.06); border-radius: 20px; }
-  .pipeline-step strong { color: #1c1c2e; }
-  .pipeline-step small  { color: var(--muted); }
-  .pipeline-step span {
-    background: var(--violet);
-    color: white;
-    box-shadow: 0 4px 12px oklch(52% 0.22 300 / 0.30);
-    border: none;
-  }
-
-  .cube-face { background: rgba(255,255,255,0.55); border-color: rgba(0,0,0,0.08); box-shadow: none; }
-  .decision-sheet { border-color: rgba(124,58,237,0.40); background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(219,39,119,0.05)); box-shadow: 0 4px 16px rgba(124,58,237,0.10); }
-  .cube-legend span { background: rgba(255,255,255,0.92); border-color: rgba(0,0,0,0.08); color: var(--muted); }
-  .cube-legend i { background: var(--blue); }
-  .cube-legend span:last-child i { background: var(--hot); }
-  .cube-point { background: var(--blue); box-shadow: 0 0 0 5px rgba(59,130,246,0.14), 0 3px 10px rgba(59,130,246,0.30); }
-  .cube-point.hot { background: var(--hot); box-shadow: 0 0 0 5px rgba(219,39,119,0.14), 0 3px 10px rgba(219,39,119,0.30); }
-  .cube-point.synthetic { background: #10b981; box-shadow: 0 0 0 5px rgba(16,185,129,0.14), 0 3px 10px rgba(16,185,129,0.30); }
-
-  .dot { background: var(--hot); box-shadow: 0 0 0 4px rgba(219,39,119,0.12), 0 2px 8px rgba(219,39,119,0.25); }
-  .dot.alt { background: var(--blue); box-shadow: 0 0 0 4px rgba(59,130,246,0.12), 0 2px 8px rgba(59,130,246,0.25); }
-  .dot.ghost { background: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,0.14); }
-
-  .algo-visual {
-    background:
-      linear-gradient(90deg, oklch(52% 0.22 300 / 0.05) 1px, transparent 1px) 0 0 / 28px 28px,
-      linear-gradient(0deg, oklch(52% 0.22 300 / 0.05) 1px, transparent 1px) 0 0 / 28px 28px,
-      oklch(98% 0.005 280);
-    border-color: rgba(0,0,0,0.07);
-    border-radius: 18px;
-  }
-  .algo-visual::before { border-left-color: oklch(52% 0.22 300 / 0.22); border-bottom-color: oklch(52% 0.22 300 / 0.22); }
-
-  .flow-step { background: var(--violet); color: white; border: none; box-shadow: 0 2px 12px oklch(52% 0.22 300 / 0.25); }
-  .node { background: var(--violet); color: white; border: none; }
-  .algo-point strong { background: var(--violet); color: white; }
-
-  .viz-chip { background: rgba(255,255,255,0.92); border-color: rgba(0,0,0,0.10); color: #1c1c2e; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-  .viz-chip.hot { background: rgba(219,39,119,0.08); border: 1px solid rgba(219,39,119,0.30); color: var(--hot); }
-  .viz-chip.cool { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.30); color: var(--blue); }
-  .viz-arrow { background: linear-gradient(90deg, var(--violet), var(--hot)); opacity: 0.58; box-shadow: none; }
-  .viz-arrow::after { border-top-color: var(--hot); border-right-color: var(--hot); }
-  .line-viz { background: linear-gradient(90deg, #7c3aed, var(--hot), var(--sun)); }
-  .tree-viz {
-    background:
-      linear-gradient(var(--hot),var(--hot)) 50% 16px/3px 32px no-repeat,
-      linear-gradient(135deg,transparent 47%,var(--blue) 48%,var(--blue) 52%,transparent 53%) 50% 42px/110px 34px no-repeat,
-      linear-gradient(45deg,transparent 47%,#10b981 48%,#10b981 52%,transparent 53%) 50% 42px/110px 34px no-repeat;
-  }
-
-  /* ── PRODUCERS ──────────────────────────────────────────────── */
-  .producer-card { background: rgba(255,255,255,0.98); border-color: rgba(0,0,0,0.06); box-shadow: 0 2px 24px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.9); border-radius: 26px; }
-  .producer-card:hover { border-color: oklch(52% 0.22 300 / 0.18); box-shadow: 0 8px 48px rgba(0,0,0,0.11), 0 0 0 1px oklch(52% 0.22 300 / 0.06); }
-  .producer-photo-wrap { background: oklch(95% 0.02 280); }
-  .contact-link {
-    background: oklch(95% 0.05 280);
-    border: 1px solid oklch(87% 0.08 280);
-    color: #4c1d95;
-    box-shadow: none;
-    transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease;
-  }
-  .contact-link:hover {
-    background: var(--violet);
-    color: white;
-    box-shadow: 0 4px 14px oklch(52% 0.22 300 / 0.32);
-    border-color: transparent;
-  }
-  .contact-slot { background: rgba(255,255,255,0.80); border-color: rgba(0,0,0,0.08); }
-  .producer-heading h2 { text-shadow: none; }
-
-  /* ── MISC ───────────────────────────────────────────────────── */
-  .advice-card { border-color: oklch(52% 0.22 300 / 0.12); }
-  .source-list a { color: var(--violet); }
-
-  /* Hero dark card — deeper, richer */
-  .phone-preview {
-    background: oklch(13% 0.04 285);
-    box-shadow:
-      inset 0 0 0 1px rgba(255,255,255,0.08),
-      inset 0 1px 0 rgba(255,255,255,0.14),
-      0 8px 48px rgba(0,0,0,0.28),
-      0 2px 8px rgba(0,0,0,0.18);
-  }
-  .avatar { background: conic-gradient(from 220deg, var(--gold), var(--blue), var(--hot), #7c3aed, var(--gold)); }
-  .avatar-inner { background: oklch(13% 0.04 285); color: #fff; }
-  .beast-mark { box-shadow: 0 10px 40px oklch(52% 0.22 300 / 0.32); border-radius: 34px; }
-  .mini-stat div { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); }
-  .mini-stat span { color: rgba(255,255,255,0.58); }
-  .story { background: rgba(255,255,255,0.07); border-radius: 16px; }
-  .story:hover { background: rgba(255,255,255,0.12); }
-  .story-icon { background: var(--violet); color: white; border: none; box-shadow: none; }
-  .research-map { border-color: rgba(0,0,0,0.07); background: rgba(255,255,255,0.72); border-radius: 26px; }
-  .algo-card { border-color: rgba(0,0,0,0.07); }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: oklch(95% 0.01 280); }
-  ::-webkit-scrollbar-thumb { background: oklch(52% 0.22 300 / 0.28); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: oklch(52% 0.22 300 / 0.48); }
-
-  /* Ring arc glow */
-  @keyframes neonPulse {
-    0%,100% { filter: drop-shadow(0 4px 12px oklch(52% 0.22 300 / 0.42)); }
-    50%      { filter: drop-shadow(0 6px 22px oklch(52% 0.22 300 / 0.62)); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .ring-arc { animation: none !important; filter: drop-shadow(0 4px 12px oklch(52% 0.22 300 / 0.42)); }
-  }
-
-  /* ── ENHANCE: contact-link needs display:inline-flex for hover transition ── */
-  .contact-link { display: inline-flex; align-items: center; }
-</style>
-"""
-
-PREMIUM_HEALTH_OVERRIDE = """
-<style>
-  :root {
-    --ink: #14241b;
-    --muted: #66746c;
-    --line: rgba(21, 60, 41, 0.12);
-    --surface: #ffffff;
-    --hot: #eaa377;
-    --sun: #f0c092;
-    --gold: #d9b879;
-    --violet: #347849;
-    --blue: #4f7f65;
-    --forest: #153c29;
-    --green: #347849;
-    --sage: #e9f0e8;
-    --paper: #f7faf6;
-    --peach: #eaa377;
-    --health-shadow: 0 24px 70px rgba(21, 60, 41, 0.10);
-    --health-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  }
-
-  body {
-    color: var(--ink);
-    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-    background: #edf2ed;
-  }
-
-  body::before {
-    display: block !important;
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,.72), rgba(237,242,237,.88)),
-      url("/static/premium-health-pattern.png") center top / cover fixed no-repeat;
-    opacity: .34;
-  }
-
-  main {
-    width: min(1240px, calc(100vw - 36px));
-    padding: 20px 0 72px;
-  }
-
-  h1, h2, h3, .brand {
-    color: var(--ink);
-    font-family: "Manrope", "DM Sans", ui-sans-serif, sans-serif;
-    letter-spacing: 0;
-  }
-
-  h1 {
-    font-size: clamp(42px, 6.4vw, 82px);
-    line-height: .96;
-  }
-
-  h2 { line-height: 1.1; }
-  p { line-height: 1.65; }
-
-  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
-    outline: 3px solid rgba(52, 120, 73, .38);
-    outline-offset: 3px;
-  }
-
-  .nav {
-    position: sticky;
-    top: 14px;
-    z-index: 20;
-    max-width: 860px;
-    margin: 0 auto 22px;
-    padding: 8px 9px 8px 12px;
-    border-color: rgba(21,60,41,.10);
-    border-radius: 999px;
-    background: rgba(250,252,249,.88);
-    box-shadow: 0 14px 42px rgba(21,60,41,.11);
-    backdrop-filter: blur(24px) saturate(150%);
-  }
-
-  .brand {
-    color: var(--forest);
-    font-weight: 800;
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-
-  .brand-logo {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    box-shadow: none;
-  }
-
-  .nav-links { gap: 2px; }
-
-  .nav-links a, .pill {
-    min-height: 38px;
-    display: inline-flex;
-    align-items: center;
-    border-color: transparent;
-    color: var(--muted);
-    background: transparent;
-    box-shadow: none;
-    font-weight: 700;
-    transition: color 420ms var(--health-ease), background 420ms var(--health-ease), transform 420ms var(--health-ease);
-  }
-
-  .nav-links a:hover, .pill:hover {
-    color: var(--forest);
-    background: var(--sage);
-    box-shadow: none;
-    transform: translateY(-1px);
-  }
-
-  .hero, .card, form {
-    border-color: rgba(21,60,41,.09);
-    border-radius: 26px;
-    background: rgba(255,255,255,.94);
-    box-shadow: var(--health-shadow);
-    backdrop-filter: none;
-  }
-
-  .hero {
-    padding: 8px;
-    gap: 8px;
-    background: rgba(255,255,255,.48);
-    border-radius: 32px;
-  }
-
-  .hero-copy {
-    min-height: 540px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    margin: 0;
-    padding: clamp(30px, 6vw, 72px);
-    border-radius: 25px;
-    background: linear-gradient(145deg, #fbfdf9, #e4eee1);
-  }
-
-  .hero-copy h1 span { color: var(--green); }
-
-  .lead {
-    color: var(--muted);
-    font-size: clamp(16px, 2vw, 19px);
-    line-height: 1.65;
-  }
-
-  .kicker {
-    padding: 7px 11px;
-    border: 1px solid rgba(52,120,73,.16);
-    border-radius: 999px;
-    color: var(--green);
-    background: rgba(233,240,232,.9);
-    font-family: "DM Sans", sans-serif;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-  }
-
-  .button, button {
-    border: 0;
-    border-radius: 999px;
-    color: #fff;
-    background: var(--forest);
-    box-shadow: 0 12px 28px rgba(21,60,41,.20);
-    font-family: "DM Sans", sans-serif;
-    font-weight: 800;
-    transition: transform 520ms var(--health-ease), background 520ms var(--health-ease), box-shadow 520ms var(--health-ease);
-  }
-
-  .button {
-    min-height: 52px;
-    display: inline-flex;
-    gap: 14px;
-    align-items: center;
-    justify-content: center;
-    padding: 7px 8px 7px 20px;
-  }
-
-  .button::after {
-    content: "↗";
-    width: 36px;
-    height: 36px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    color: var(--forest);
-    background: #dff3d5;
-    transition: transform 520ms var(--health-ease);
-  }
-
-  .button:hover, button:hover {
-    color: #fff;
-    background: #1d5036;
-    box-shadow: 0 18px 38px rgba(21,60,41,.26);
-    filter: none;
-    transform: translateY(-2px);
-  }
-
-  .button:hover::after { transform: translate(2px, -2px); }
-  .button:active, button:active { transform: scale(.98); }
-
-  .button.secondary {
-    padding-right: 20px;
-    border: 1px solid rgba(21,60,41,.15);
-    color: var(--forest);
-    background: rgba(255,255,255,.82);
-    box-shadow: none;
-  }
-
-  .button.secondary::after { display: none; }
-  .button.secondary:hover { color: var(--forest); background: var(--sage); box-shadow: none; }
-  .action-form button { color: white; background: var(--forest); box-shadow: 0 12px 28px rgba(21,60,41,.20); }
-  .action-form button:hover { background: #1d5036; box-shadow: 0 18px 38px rgba(21,60,41,.26); }
-
-  .premium-health-visual {
-    min-height: 540px;
-    position: relative;
-    overflow: hidden;
-    border-radius: 25px;
-    background: var(--paper);
-  }
-
-  .premium-health-visual img {
-    width: 100%;
-    height: 100%;
-    min-height: 540px;
-    display: block;
-    object-fit: cover;
-  }
-
-  .visual-caption {
-    position: absolute;
-    right: 18px;
-    bottom: 18px;
-    left: 18px;
-    padding: 16px;
-    border: 1px solid rgba(255,255,255,.48);
-    border-radius: 18px;
-    color: white;
-    background: rgba(21,60,41,.86);
-    box-shadow: 0 16px 40px rgba(21,60,41,.18);
-  }
-
-  .visual-caption strong { display: block; font-family: "Manrope"; font-size: 18px; }
-  .visual-caption span { display: block; margin-top: 3px; font-size: 12px; opacity: .78; }
-
-  .trust-strip {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0,1fr));
-    gap: 10px;
-    margin-top: 14px;
-  }
-
-  .trust-item {
-    padding: 18px;
-    border: 1px solid rgba(21,60,41,.08);
-    border-radius: 20px;
-    background: rgba(255,255,255,.88);
-    box-shadow: 0 10px 30px rgba(21,60,41,.06);
-  }
-
-  .trust-item strong { display: block; color: var(--forest); font: 800 25px "Manrope"; }
-  .trust-item span { color: var(--muted); font-size: 13px; }
-
-  .section-intro {
-    max-width: 720px;
-    padding: 72px 4px 22px;
-  }
-
-  .section-intro h1 { margin-top: 14px; font-size: clamp(38px, 5vw, 64px); }
-
-  .card {
-    padding: clamp(18px, 3vw, 28px);
-    transition: transform 520ms var(--health-ease), box-shadow 520ms var(--health-ease), border-color 520ms var(--health-ease);
-  }
-
-  .section-grid > * { min-width: 0; }
-  .card p { overflow-wrap: anywhere; }
-
-  .card:hover {
-    border-color: rgba(52,120,73,.18);
-    box-shadow: 0 30px 74px rgba(21,60,41,.13);
-    transform: translateY(-3px);
-  }
-
-  .support-grid { gap: 18px; }
-  .support-grid .card { min-height: 220px; }
-
-  .phone-preview {
-    color: var(--ink);
-    background: var(--paper);
-    box-shadow: inset 0 0 0 1px rgba(21,60,41,.08);
-  }
-
-  .mini-stat div, .story {
-    color: var(--ink);
-    border: 1px solid rgba(21,60,41,.08);
-    background: var(--sage);
-  }
-
-  .mini-stat span, .story span { color: var(--muted); }
-  .story-icon, .flow-step, .node, .algo-point strong, .pipeline-step span { background: var(--forest); }
-
-  .research-map {
-    border-color: rgba(21,60,41,.08);
-    background: #f4f8f3;
-  }
-
-  .pipeline-step, .method, .algo-visual {
-    border-color: rgba(21,60,41,.09);
-    background: rgba(255,255,255,.88);
-    box-shadow: none;
-  }
-
-  .pipeline-step { transform: none; }
-  .pipeline-step strong, .method strong { color: var(--forest); }
-  .pipeline-step span { box-shadow: none; }
-
-  .algorithm-lab { gap: 18px; }
-  .algo-card { min-height: 300px; }
-  .algo-visual { height: 148px; background-color: #f4f8f3; }
-  .algo-point strong { box-shadow: none; }
-  .viz-arrow { height: 2px; background: var(--green); opacity: .42; }
-  .viz-arrow::after { display: none; }
-  .line-viz { background: var(--green); }
-
-  .producer-card {
-    border-color: rgba(21,60,41,.08);
-    background: rgba(255,255,255,.94);
-    box-shadow: var(--health-shadow);
-  }
-
-  .producer-card:hover {
-    border-color: rgba(52,120,73,.18);
-    box-shadow: 0 30px 74px rgba(21,60,41,.14);
-  }
-
-  .contact-link {
-    color: var(--forest);
-    background: var(--sage);
-    border-color: transparent;
-    box-shadow: none;
-  }
-
-  .contact-link:hover { color: white; background: var(--forest); box-shadow: none; }
-
-  .predict-layout {
-    grid-template-columns: minmax(250px,.62fr) minmax(0,1.38fr);
-    gap: 18px;
-  }
-
-  .profile {
-    top: 86px;
-    padding: 26px;
-    background: var(--forest);
-    color: white;
-  }
-
-  .profile h2 { color: white; }
-  .profile .note { color: rgba(255,255,255,.70); }
-  .profile .pill { color: #dff3d5; background: rgba(255,255,255,.10); }
-  .profile .method-grid { grid-template-columns: 1fr; }
-  .profile .method { color: white; border-color: rgba(255,255,255,.10); background: rgba(255,255,255,.07); }
-  .profile .method strong { color: #dff3d5; }
-  .profile .method span { color: rgba(255,255,255,.66); }
-
-  .profile-guide { display: grid; gap: 9px; margin-top: 24px; }
-  .profile-guide div {
-    display: grid;
-    grid-template-columns: 34px 1fr;
-    gap: 11px;
-    align-items: center;
-    padding: 12px;
-    border: 1px solid rgba(255,255,255,.10);
-    border-radius: 15px;
-    background: rgba(255,255,255,.07);
-  }
-  .profile-guide strong {
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    color: var(--forest);
-    background: #dff3d5;
-  }
-  .profile-guide span { color: rgba(255,255,255,.76); font-size: 13px; line-height: 1.4; }
-
-  .predict-form { padding: clamp(20px,4vw,38px); }
-  .form-head { align-items: start; }
-
-  .form-progress {
-    height: 7px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: var(--sage);
-  }
-
-  .form-progress span {
-    width: 25%;
-    height: 100%;
-    display: block;
-    border-radius: inherit;
-    background: var(--green);
-    transition: transform 620ms var(--health-ease);
-    transform-origin: left;
-  }
-
-  .step-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    margin: 16px 0 4px;
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-  }
-
-  .form-step { display: block; padding-top: 20px; }
-  .js .form-step { display: none; }
-  .js .form-step.active { display: block; animation: stepIn 620ms var(--health-ease) both; }
-  .form-step h2 { margin-bottom: 5px; font-size: clamp(25px,4vw,38px); }
-  .form-step > p { max-width: 620px; margin-top: 0; color: var(--muted); }
-
-  .field-grid {
-    display: grid;
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 12px;
-    margin-top: 22px;
-  }
-
-  label {
-    border-color: rgba(21,60,41,.09);
-    border-radius: 17px;
-    color: var(--forest);
-    background: #f5f8f4;
-    font-weight: 800;
-  }
-
-  input, select {
-    border: 1px solid transparent;
-    color: var(--ink);
-    background: white;
-  }
-
-  input:focus, select:focus {
-    border-color: rgba(52,120,73,.35);
-    box-shadow: 0 0 0 4px rgba(52,120,73,.12);
-  }
-
-  .step-actions {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 24px;
-  }
-
-  .step-actions button {
-    width: auto;
-    min-width: 140px;
-    margin: 0;
-    padding: 0 20px;
-  }
-
-  .step-actions .step-back {
-    color: var(--forest);
-    background: var(--sage);
-    box-shadow: none;
-  }
-
-  .review-grid {
-    display: grid;
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 9px;
-    margin-top: 20px;
-  }
-
-  .review-item {
-    padding: 14px;
-    border-radius: 15px;
-    background: var(--sage);
-  }
-
-  .review-item span { display: block; color: var(--muted); font-size: 11px; }
-  .review-item strong { display: block; margin-top: 4px; color: var(--forest); }
-
-  .result-card {
-    width: min(760px,100%);
-    margin: 48px auto 24px;
-    padding: clamp(24px,5vw,52px);
-  }
-
-  .ring-arc {
-    stroke: var(--green);
-    filter: drop-shadow(0 5px 13px rgba(52,120,73,.20));
-  }
-
-  .ring-bg-circle { stroke: var(--sage); }
-  .prob { color: var(--forest); }
-
-  .band {
-    color: var(--forest);
-    background: #dcefd8;
-    border: 1px solid rgba(52,120,73,.13);
-    box-shadow: none;
-  }
-
-  .result-meaning, .next-actions, .reason-box {
-    margin-top: 18px;
-    padding: 22px;
-    border: 1px solid rgba(21,60,41,.09);
-    border-radius: 21px;
-    text-align: left;
-    background: #f5f8f4;
-  }
-
-  .next-actions { background: var(--forest); color: white; }
-  .next-actions h2 { color: white; }
-  .next-action { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; margin-top: 12px; }
-  .next-action strong { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; color: var(--forest); background: #dff3d5; }
-  .next-action span { color: rgba(255,255,255,.78); line-height: 1.45; }
-
-  .reason-box { background: white; }
-  .reason-box summary { cursor: pointer; color: var(--forest); }
-  .reason-box[open] summary { margin-bottom: 12px; }
-  .table-wrapper { border-color: rgba(21,60,41,.09); background: white; }
-  .metric-table th { color: var(--forest); background: var(--sage); }
-  .bar-fill { background: var(--green); }
-
-  .evaluation-dashboard {
-    display: grid;
-    gap: 16px;
-    margin-top: 24px;
-  }
-
-  .selected-model-banner {
-    display: grid;
-    grid-template-columns: 54px 1fr;
-    gap: 16px;
-    align-items: center;
-    padding: 22px;
-    border: 1px solid rgba(102,173,122,.34);
-    border-radius: 21px;
-    color: white;
-    background: var(--forest);
-  }
-
-  .selected-model-icon {
-    width: 54px;
-    height: 54px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    color: var(--forest);
-    background: #dff3d5;
-    font-size: 24px;
-    font-weight: 900;
-  }
-
-  .selected-model-banner span,
-  .evaluation-panel-head span {
-    display: block;
-    color: var(--green);
-    font-size: 11px;
-    font-weight: 900;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-  }
-
-  .selected-model-banner span { color: #bfe3c3; }
-  .selected-model-banner h2 { margin: 4px 0 3px; color: white; font-size: clamp(22px,3vw,32px); }
-  .selected-model-banner p { margin: 0; color: rgba(255,255,255,.72); }
-  .selected-model-empty { color: var(--forest); background: var(--sage); }
-  .selected-model-empty h2 { color: var(--forest); }
-
-  .evaluation-panels {
-    display: grid;
-    grid-template-columns: minmax(0,1.05fr) minmax(0,.95fr);
-    gap: 16px;
-  }
-
-  .evaluation-panel {
-    min-width: 0;
-    padding: 22px;
-    border: 1px solid rgba(21,60,41,.1);
-    border-radius: 21px;
-    background: #f9fbf8;
-  }
-
-  .evaluation-panel-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 18px;
-    align-items: start;
-  }
-
-  .evaluation-panel-head h2 { margin: 5px 0 0; font-size: clamp(20px,2.5vw,28px); }
-  .evaluation-panel-head p { max-width: 230px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
-
-  .evaluation-legend, .roc-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 13px;
-    margin-top: 18px;
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 800;
-  }
-
-  .evaluation-legend span, .roc-legend span { display: inline-flex; gap: 6px; align-items: center; }
-  .evaluation-legend i, .roc-legend i {
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
-    background: var(--metric-color, var(--curve-color));
-  }
-
-  .eval-models {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(150px,1fr));
-    gap: 10px;
-    margin-top: 18px;
-  }
-
-  .eval-model-group {
-    min-width: 0;
-    padding: 12px;
-    border: 1px solid rgba(21,60,41,.08);
-    border-radius: 14px;
-    background: white;
-  }
-
-  .eval-model-group > strong {
-    display: block;
-    min-height: 35px;
-    color: var(--forest);
-    font-size: 11px;
-    line-height: 1.35;
-  }
-
-  .eval-bars {
-    height: 125px;
-    display: grid;
-    grid-template-columns: repeat(6,minmax(9px,1fr));
-    gap: 5px;
-    align-items: end;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-bottom: 1px solid rgba(21,60,41,.15);
-  }
-
-  .eval-bar {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: end;
-    gap: 4px;
-    min-width: 0;
-  }
-
-  .eval-bar i {
-    width: 100%;
-    height: var(--metric-value);
-    min-height: 2px;
-    border-radius: 5px 5px 1px 1px;
-    background: var(--metric-color);
-  }
-
-  .eval-bar small {
-    display: none;
-    color: var(--muted);
-    font-size: 8px;
-    white-space: nowrap;
-  }
-
-  .eval-bar.unavailable i {
-    height: 2px;
-    background: repeating-linear-gradient(90deg,rgba(102,116,108,.35) 0 4px,transparent 4px 7px);
-  }
-
-  .evaluation-empty, .roc-unavailable {
-    padding: 30px 20px;
-    border: 1px dashed rgba(21,60,41,.22);
-    border-radius: 14px;
-    color: var(--muted);
-    background: var(--sage);
-    text-align: center;
-  }
-
-  .roc-chart { display: block; width: 100%; height: auto; margin-top: 12px; overflow: visible; }
-  .roc-chart text { fill: var(--muted); font: 11px "DM Sans",sans-serif; }
-  .roc-grid { stroke: rgba(21,60,41,.32); stroke-width: 1.5; }
-  .roc-baseline { stroke: rgba(102,116,108,.55); stroke-width: 1.5; stroke-dasharray: 7 7; }
-  .roc-model-curve {
-    fill: none;
-    stroke: var(--curve-color);
-    stroke-width: 3.5;
-    stroke-linejoin: round;
-    stroke-linecap: round;
-  }
-  .roc-baseline-key {
-    height: 2px !important;
-    border-radius: 0 !important;
-    background: repeating-linear-gradient(90deg,rgba(102,116,108,.7) 0 5px,transparent 5px 8px) !important;
-  }
-  .roc-unavailable { margin-top: 18px; min-height: 220px; display: grid; place-items: center; }
-
-  .advice-card { border-color: rgba(21,60,41,.09); }
-  .source-list a { color: var(--green); }
-
-  @keyframes stepIn {
-    from { opacity: 0; transform: translateY(16px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @media (max-width: 920px) {
-    .nav { top: 8px; }
-    .hero, .predict-layout, .section-grid, .algorithm-lab, .advice-grid, .research-map, .producer-grid, .evaluation-panels { grid-template-columns: 1fr; }
-    .profile { position: static; }
-    .hero-copy, .premium-health-visual, .premium-health-visual img { min-height: 430px; }
-  }
-
-  @media (max-width: 640px) {
-    main { width: min(100vw - 18px,1240px); padding-top: 9px; }
-    .nav { border-radius: 21px; padding: 7px; align-items: flex-start; }
-    .nav-links { justify-content: flex-end; }
-    .nav-links a { min-height: 32px; padding: 6px 8px; font-size: 11px; }
-    .hero { padding: 5px; }
-    .hero-copy { min-height: 430px; padding: 27px; }
-    .premium-health-visual, .premium-health-visual img { min-height: 320px; }
-    .trust-strip, .field-grid, .review-grid { grid-template-columns: 1fr; }
-    .form-head { display: block; }
-    .form-head .pill { margin-top: 8px; }
-    .step-actions { flex-direction: column-reverse; }
-    .step-actions button { width: 100%; }
-    .result-card { margin-top: 20px; }
-    .evaluation-panel, .selected-model-banner { padding: 17px; }
-    .evaluation-panel-head { display: block; }
-    .evaluation-panel-head p { max-width: none; margin-top: 8px; }
-    .eval-models { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      scroll-behavior: auto !important;
-      animation-duration: 1ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 1ms !important;
-    }
-  }
-</style>
-"""
 
 PREMIUM_HEALTH_CHAT_STYLE = """
 <style>
@@ -2644,23 +209,9 @@ PREMIUM_HEALTH_CHAT_STYLE = """
 """
 
 
-class ObesityInput(BaseModel):
-    age: int = Field(..., ge=5, le=100)
-    sex: Literal["M", "F"] = Field(..., examples=["M", "F"])
-    height_cm: float = Field(..., ge=80, le=230)
-    weight_kg: float = Field(..., ge=20, le=250)
-    physical_activity_hours_per_week: float = Field(..., ge=0, le=40)
-    screen_time_hours_per_day: float = Field(..., ge=0, le=24)
-    sleep_hours: float = Field(..., ge=0, le=16)
-    fast_food_meals_per_week: int = Field(..., ge=0, le=30)
-    sugary_drinks_per_day: float = Field(..., ge=0, le=20)
-    family_history_obesity: int = Field(..., ge=0, le=1)
-
-
-class ChatRequest(BaseModel):
-    message: str
-    lang: str = "auto"
-    context: Optional[dict] = None
+def render_styles() -> str:
+    """Return the inline <style> blocks extracted to templates/partials/styles.html."""
+    return render("partials/styles.html", {})
 
 
 def page_shell(title: str, body: str, chat_context: dict | None = None) -> str:
@@ -2668,35 +219,10 @@ def page_shell(title: str, body: str, chat_context: dict | None = None) -> str:
     probability = str(chat_context.get("probability", "")) if chat_context else ""
     notify = bool(chat_context.get("notify", False)) if chat_context else False
     widget = chat_widget_html(risk_tier, probability, notify)
-    return f"""
-    <!doctype html>
-    <html lang="en">
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>{title}</title>
-      {STYLE}
-      {CYBERPUNK_OVERRIDE}
-      {PREMIUM_HEALTH_OVERRIDE}
-      <script>document.documentElement.classList.add('js');</script>
-    </head>
-    <body>
-      <main>
-        <nav class="nav">
-          <div class="brand"><img class="brand-logo" src="/static/obeast-logo.png" alt="O-Beast logo">O-Beast</div>
-          <div class="nav-links">
-            <a href="/">Home</a>
-            <a href="/predictor">Predictor</a>
-            <a href="/advice">Advice</a>
-            <a href="/methods">Methods</a>
-          </div>
-        </nav>
-        {body}
-      </main>
-      {widget}
-    </body>
-    </html>
-    """
+    return render(
+        "base.html",
+        {"title": title, "styles": render_styles(), "body": body, "widget": widget},
+    )
 
 
 def prediction_error_html(message: str) -> str:
@@ -2717,6 +243,45 @@ def validate_form_input(input_data: dict) -> None:
     import pandas as pd
 
     validate_prediction_frame(pd.DataFrame([input_data]))
+
+
+def build_prediction_input(
+    *,
+    age: int,
+    sex: str,
+    height_cm: float,
+    weight_kg: float,
+    family_history_obesity: int,
+    high_calorie_food_frequency: int,
+    vegetable_frequency: float,
+    main_meals_per_day: float,
+    food_between_meals_frequency: int,
+    smoke: int,
+    water_daily: float,
+    calorie_monitoring: int,
+    physical_activity_freq: float,
+    screen_time_band: int,
+    alcohol_frequency: int,
+    transportation: str,
+) -> dict:
+    return {
+        "age": age,
+        "sex": sex,
+        "height_cm": height_cm,
+        "weight_kg": weight_kg,
+        "family_history_obesity": family_history_obesity,
+        "high_calorie_food_frequency": high_calorie_food_frequency,
+        "vegetable_frequency": vegetable_frequency,
+        "main_meals_per_day": main_meals_per_day,
+        "food_between_meals_frequency": food_between_meals_frequency,
+        "smoke": smoke,
+        "water_daily": water_daily,
+        "calorie_monitoring": calorie_monitoring,
+        "physical_activity_freq": physical_activity_freq,
+        "screen_time_band": screen_time_band,
+        "alcohol_frequency": alcohol_frequency,
+        "transportation": transportation,
+    }
 
 
 def methods_html() -> str:
@@ -2947,262 +512,6 @@ def algorithm_visual_html() -> str:
         """
         for name, body, visual, points in cards
     ) + '</div>'
-
-
-def _ranked_metrics(metrics: dict) -> list[tuple[str, dict]]:
-    import math
-
-    def sort_key(item):
-        m = item[1]
-        roc_auc = m.get("roc_auc", 0)
-        f1 = m.get("f1", 0)
-        epr = m.get("extreme_probability_rate", 0)
-        brier = m.get("brier_score", 1)
-
-        # Handle NaN values
-        roc_auc = 0.0 if math.isnan(roc_auc) else roc_auc
-        f1 = 0.0 if math.isnan(f1) else f1
-        epr = 0.0 if math.isnan(epr) else epr
-        brier = 1.0 if math.isnan(brier) else brier
-
-        return (roc_auc, f1, -epr, -brier)
-
-    return sorted(metrics.items(), key=sort_key, reverse=True)
-
-
-def best_model_reason(result: dict) -> str:
-    metrics = result.get("metrics", {})
-    best_name = result.get("base_model_name", "the selected model")
-    if not metrics or best_name not in metrics:
-        return "The app will explain the winning algorithm after the model is trained and metrics are available."
-
-    ranked = _ranked_metrics(metrics)
-    best_metrics = metrics[best_name]
-    runner_name = ranked[1][0] if len(ranked) > 1 else None
-    import math
-    brier = best_metrics.get("brier_score")
-    brier_text = (
-        f" with a Brier score of {brier:.4f}"
-        if isinstance(brier, (int, float)) and not math.isnan(brier)
-        else ""
-    )
-    if runner_name:
-        return (
-            f"{best_name} is selected for the current training data because the tournament sorts models by "
-            f"cross-validated ROC-AUC first, F1 score second, fewer extreme probabilities third, and Brier score fourth. "
-            f"It stayed at the top of that rule{brier_text}. The nearest comparison model in this run is {runner_name}."
-        )
-    return f"{best_name} is selected for the current training data under the current tournament rule."
-
-
-def metric_bars_html(metrics: dict) -> str:
-    if not metrics:
-        return "<p>No metric bars yet. Train the model first.</p>"
-    import math
-    rows = []
-    for name, values in _ranked_metrics(metrics):
-        score = values.get("roc_auc", values.get("f1", 0))
-        if isinstance(score, (int, float)) and not math.isnan(score):
-            percent = max(0, min(100, round(float(score) * 100)))
-        else:
-            percent = 0
-        rows.append(
-            f'<div class="bar-row"><span>{name}</span><div class="bar-track"><div class="bar-fill" style="--score:{percent}%"></div></div><strong>{percent}%</strong></div>'
-        )
-    return '<div class="bars">' + ''.join(rows) + '</div>'
-
-
-def metric_table_html(metrics: dict) -> str:
-    if not metrics:
-        return ""
-    rows = []
-    for name, values in _ranked_metrics(metrics):
-        rows.append(
-            "<tr>"
-            f"<td>{escape(name)}</td>"
-            f"<td>{values.get('accuracy', 0):.2f}</td>"
-            f"<td>{values.get('kappa', 0):.2f}</td>"
-            f"<td>{values.get('sensitivity', 0):.2f}</td>"
-            f"<td>{values.get('specificity', 0):.2f}</td>"
-            "</tr>"
-        )
-    return (
-        '<div class="table-wrapper">'
-        '<table class="metric-table">'
-        "<colgroup><col><col><col><col><col></colgroup>"
-        "<thead><tr><th>Model</th><th>Accuracy</th><th>Kappa</th>"
-        '<th><abbr title="Sensitivity">Sens.</abbr></th>'
-        '<th><abbr title="Specificity">Spec.</abbr></th></tr></thead>'
-        f"<tbody>{''.join(rows)}</tbody>"
-        "</table>"
-        "</div>"
-    )
-
-
-EVALUATION_METRICS = (
-    ("roc_auc", "ROC-AUC", "#347849"),
-    ("f1", "F1 score", "#397f9a"),
-    ("accuracy", "Accuracy", "#e29a70"),
-    ("kappa", "Kappa", "#b89038"),
-    ("sensitivity", "Sensitivity", "#7658a6"),
-    ("specificity", "Specificity", "#bd5d64"),
-)
-
-
-def _finite_metric(value) -> float | None:
-    import math
-
-    if not isinstance(value, (int, float)) or not math.isfinite(value):
-        return None
-    return float(value)
-
-
-def _friendly_model_name(name: str) -> str:
-    return str(name).replace("_", " ").title().replace("Rbf", "RBF").replace("Mlp", "MLP")
-
-
-def selected_model_banner_html(best_model: str, metrics: dict) -> str:
-    values = metrics.get(best_model, {})
-    roc_auc = _finite_metric(values.get("roc_auc"))
-    f1 = _finite_metric(values.get("f1"))
-    if not values:
-        return """
-        <section class="selected-model-banner selected-model-empty">
-          <div class="selected-model-icon" aria-hidden="true">?</div>
-          <div><span>Current evaluation</span><h2>Train the model to see the selected result</h2></div>
-        </section>
-        """
-    roc_text = f"ROC-AUC {roc_auc:.2f}" if roc_auc is not None else "ROC-AUC not available"
-    f1_text = f"F1 score {f1:.2f}" if f1 is not None else "F1 score not available"
-    return f"""
-    <section class="selected-model-banner">
-      <div class="selected-model-icon" aria-hidden="true">&#10003;</div>
-      <div>
-        <span>Selected for the current training data</span>
-        <h2>{escape(_friendly_model_name(best_model))}</h2>
-        <p>{roc_text} <b aria-hidden="true">&middot;</b> {f1_text}</p>
-      </div>
-    </section>
-    """
-
-
-def metric_comparison_chart_html(metrics: dict) -> str:
-    legend = "".join(
-        f'<span><i style="--metric-color:{color}"></i>{label}</span>'
-        for _, label, color in EVALUATION_METRICS
-    )
-    groups = []
-    for model_name, values in _ranked_metrics(metrics):
-        bars = []
-        for key, label, color in EVALUATION_METRICS:
-            value = _finite_metric(values.get(key))
-            if value is None:
-                bars.append(
-                    f'<span class="eval-bar unavailable" style="--metric-color:{color}" '
-                    f'title="{escape(_friendly_model_name(model_name))} - {label}: Not available">'
-                    '<i></i><small>Not available</small></span>'
-                )
-                continue
-            percent = max(0, min(100, value * 100))
-            bars.append(
-                f'<span class="eval-bar" style="--metric-color:{color};--metric-value:{percent:.2f}%" '
-                f'title="{escape(_friendly_model_name(model_name))} - {label}: {value:.2f}">'
-                f'<i></i><small>{value:.2f}</small></span>'
-            )
-        groups.append(
-            f'<div class="eval-model-group"><strong>{escape(_friendly_model_name(model_name))}</strong>'
-            f'<div class="eval-bars">{"".join(bars)}</div></div>'
-        )
-    if not groups:
-        groups.append('<div class="evaluation-empty">Train the models to compare their evaluation scores.</div>')
-    return f"""
-    <section class="evaluation-panel metric-comparison">
-      <div class="evaluation-panel-head">
-        <div><span>Performance comparison</span><h2>How the models compare</h2></div>
-        <p>Higher scores are generally better for these measures.</p>
-      </div>
-      <div class="evaluation-legend">{legend}</div>
-      <div class="eval-models">{"".join(groups)}</div>
-    </section>
-    """
-
-
-def roc_curves_html(roc_curves: dict, metrics: dict) -> str:
-    import math
-
-    colors = ("#347849", "#7658a6", "#397f9a", "#e29a70", "#bd5d64", "#b89038")
-    curves = []
-    legends = []
-    for index, (model_name, curve) in enumerate(roc_curves.items()):
-        false_positive_rate = curve.get("false_positive_rate", [])
-        true_positive_rate = curve.get("true_positive_rate", [])
-        if len(false_positive_rate) != len(true_positive_rate) or len(false_positive_rate) < 2:
-            continue
-        pairs = []
-        for false_positive, true_positive in zip(false_positive_rate, true_positive_rate):
-            if not isinstance(false_positive, (int, float)) or not isinstance(true_positive, (int, float)):
-                pairs = []
-                break
-            if not math.isfinite(false_positive) or not math.isfinite(true_positive):
-                pairs = []
-                break
-            if not 0 <= false_positive <= 1 or not 0 <= true_positive <= 1:
-                pairs = []
-                break
-            x = 52 + (float(false_positive) * 350)
-            y = 270 - (float(true_positive) * 220)
-            pairs.append(f"{x:.1f},{y:.1f}")
-        if not pairs:
-            continue
-        color = colors[index % len(colors)]
-        auc = _finite_metric(metrics.get(model_name, {}).get("roc_auc"))
-        auc_text = f"AUC {auc:.2f}" if auc is not None else "AUC not available"
-        curves.append(
-            f'<polyline class="roc-model-curve" points="{" ".join(pairs)}" '
-            f'style="--curve-color:{color}"><title>{escape(_friendly_model_name(model_name))} - {auc_text}</title></polyline>'
-        )
-        legends.append(
-            f'<span><i style="--curve-color:{color}"></i>{escape(_friendly_model_name(model_name))} ({auc_text})</span>'
-        )
-    if not curves:
-        return """
-        <section class="evaluation-panel roc-panel">
-          <div class="evaluation-panel-head">
-            <div><span>ROC curves</span><h2>True-positive and false-positive trade-off</h2></div>
-          </div>
-          <div class="roc-unavailable">ROC curves are available after retraining the models.</div>
-        </section>
-        """
-    return f"""
-    <section class="evaluation-panel roc-panel">
-      <div class="evaluation-panel-head">
-        <div><span>ROC curves</span><h2>True-positive and false-positive trade-off</h2></div>
-        <p>Curves closer to the upper-left corner show stronger separation.</p>
-      </div>
-      <div class="roc-legend">{"".join(legends)}<span><i class="roc-baseline-key"></i>Random guess</span></div>
-      <svg class="roc-chart" viewBox="0 0 440 320" role="img" aria-label="Cross-validated ROC curves">
-        <line class="roc-grid" x1="52" y1="50" x2="52" y2="270"></line>
-        <line class="roc-grid" x1="52" y1="270" x2="402" y2="270"></line>
-        <line class="roc-baseline" x1="52" y1="270" x2="402" y2="50"></line>
-        {"".join(curves)}
-        <text x="227" y="307" text-anchor="middle">False positive rate</text>
-        <text x="15" y="160" text-anchor="middle" transform="rotate(-90 15 160)">True positive rate</text>
-        <text x="48" y="287" text-anchor="end">0</text><text x="402" y="287" text-anchor="middle">1</text>
-        <text x="42" y="274" text-anchor="end">0</text><text x="42" y="55" text-anchor="end">1</text>
-      </svg>
-    </section>
-    """
-
-
-def evaluation_dashboard_html(best_model: str, metrics: dict, roc_curves: dict) -> str:
-    return (
-        '<div class="evaluation-dashboard">'
-        + selected_model_banner_html(best_model, metrics)
-        + '<div class="evaluation-panels">'
-        + metric_comparison_chart_html(metrics)
-        + roc_curves_html(roc_curves, metrics)
-        + "</div></div>"
-    )
 
 
 def advice_cards_html(advice: dict) -> str:
@@ -3485,12 +794,18 @@ def advice_intro() -> str:
             "sex": "M",
             "height_cm": 170,
             "weight_kg": 65,
-            "physical_activity_hours_per_week": 3,
-            "screen_time_hours_per_day": 5,
-            "sleep_hours": 7,
-            "fast_food_meals_per_week": 2,
-            "sugary_drinks_per_day": 1,
             "family_history_obesity": 0,
+            "high_calorie_food_frequency": 1,
+            "vegetable_frequency": 2,
+            "main_meals_per_day": 3,
+            "food_between_meals_frequency": 1,
+            "smoke": 0,
+            "water_daily": 2,
+            "calorie_monitoring": 0,
+            "physical_activity_freq": 2,
+            "screen_time_band": 1,
+            "alcohol_frequency": 0,
+            "transportation": "Public_Transportation",
         },
         {"obesity_probability": 0.25},
     )
@@ -3602,11 +917,11 @@ def predictor() -> str:
         <img class="beast-mark" src="/static/obeast-logo.png" alt="O-Beast aggressive beast mascot logo">
         <h2>One clear step at a time</h2>
         <p class="note">
-          Answer ten body and lifestyle questions. O-Beast combines them into an educational probability estimate.
+          Answer UCI-style body and lifestyle questions. O-Beast combines them into an educational probability estimate.
         </p>
         <div class="profile-guide">
           <div><strong>1</strong><span>Share your body profile.</span></div>
-          <div><strong>2</strong><span>Describe your usual routine.</span></div>
+          <div><strong>2</strong><span>Describe activity and food patterns.</span></div>
           <div><strong>3</strong><span>Review answers before prediction.</span></div>
         </div>
       </aside>
@@ -3617,7 +932,7 @@ def predictor() -> str:
             <div class="kicker">Your profile</div>
             <h2 style="margin-top:12px">Start your risk check</h2>
           </div>
-          <div class="pill" id="stepCounter">Step 1 of 4</div>
+          <div class="pill" id="stepCounter">Step 1 of 5</div>
         </div>
         <div class="form-progress" aria-label="Form progress"><span id="formProgress"></span></div>
         <div class="step-meta"><span id="stepName">Body profile</span><span>Educational estimate</span></div>
@@ -3626,7 +941,7 @@ def predictor() -> str:
           <h2>First, your body profile.</h2>
           <p>These answers help calculate BMI and provide basic context for the model.</p>
           <div class="field-grid">
-            <label>Age <input name="age" type="number" min="5" max="100" value="16" required></label>
+            <label>Age <input name="age" type="number" min="14" max="100" value="16" required></label>
             <label>Sex <select name="sex"><option value="M">Male</option><option value="F">Female</option></select></label>
             <label>Height in centimetres <input name="height_cm" type="number" min="80" max="230" step="0.1" value="170" required></label>
             <label>Weight in kilograms <input name="weight_kg" type="number" min="20" max="250" step="0.1" value="65" required></label>
@@ -3636,27 +951,82 @@ def predictor() -> str:
 
         <section class="form-step" data-step="2">
           <h2>How does a usual day feel?</h2>
-          <p>Movement, sitting time, and sleep create important lifestyle signals.</p>
+          <p>Movement, sitting time, water intake, sleep, and transport create important lifestyle signals.</p>
           <div class="field-grid">
-            <label>Physical activity each week, hours <input name="physical_activity_hours_per_week" type="number" min="0" max="40" step="0.1" value="3" required></label>
-            <label>Screen time each day, hours <input name="screen_time_hours_per_day" type="number" min="0" max="24" step="0.1" value="5" required></label>
-            <label>Usual sleep each day, hours <input name="sleep_hours" type="number" min="0" max="16" step="0.1" value="7" required></label>
+            <label>Physical activity (days per week)
+              <select name="physical_activity_freq">
+                <option value="0">I do not exercise</option>
+                <option value="1">1-2 days</option>
+                <option value="2" selected>2-4 days</option>
+                <option value="3">4-5 days</option>
+              </select>
+            </label>
+            <label>Daily device / screen time
+              <select name="screen_time_band">
+                <option value="0">0-2 hours</option>
+                <option value="1" selected>3-5 hours</option>
+                <option value="2">More than 5 hours</option>
+              </select>
+            </label>
+            <label>Daily water intake
+              <select name="water_daily">
+                <option value="1">Less than 1 litre</option>
+                <option value="2" selected>1-2 litres</option>
+                <option value="3">More than 2 litres</option>
+              </select>
+            </label>
+            <label>Main transportation
+              <select name="transportation">
+                <option value="Public_Transportation">Public transportation</option>
+                <option value="Walking">Walking</option>
+                <option value="Bike">Bike</option>
+                <option value="Motorbike">Motorbike</option>
+                <option value="Automobile">Automobile</option>
+              </select>
+            </label>
           </div>
           <div class="step-actions"><button class="step-back" type="button" data-back>Previous</button><button type="button" data-next>Continue</button></div>
         </section>
 
         <section class="form-step" data-step="3">
-          <h2>Now, food and family context.</h2>
-          <p>Frequency matters more than perfection. Use answers closest to your usual routine.</p>
+          <h2>Now, your food pattern.</h2>
+          <p>These questions follow the UCI-style habit format used by the prototype model.</p>
           <div class="field-grid">
-            <label>Fast-food meals each week <input name="fast_food_meals_per_week" type="number" min="0" max="30" value="2" required></label>
-            <label>Sugary drinks each day <input name="sugary_drinks_per_day" type="number" min="0" max="20" step="0.1" value="1" required></label>
+            <label>Frequent high-calorie food <select name="high_calorie_food_frequency"><option value="0">No</option><option value="1">Yes</option></select></label>
+            <label>Vegetable frequency, 1-3 <input name="vegetable_frequency" type="number" min="1" max="3" step="0.1" value="2" required></label>
+            <label>Main meals per day, 1-4 <input name="main_meals_per_day" type="number" min="1" max="4" step="0.1" value="3" required></label>
+            <label>Food between meals
+              <select name="food_between_meals_frequency">
+                <option value="0">No</option>
+                <option value="1" selected>Sometimes</option>
+                <option value="2">Frequently</option>
+                <option value="3">Always</option>
+              </select>
+            </label>
+          </div>
+          <div class="step-actions"><button class="step-back" type="button" data-back>Previous</button><button type="button" data-next>Continue</button></div>
+        </section>
+
+        <section class="form-step" data-step="4">
+          <h2>Finally, health context.</h2>
+          <p>Family history and a few UCI-style context answers help the prototype match the training format.</p>
+          <div class="field-grid">
             <label>Family history of obesity <select name="family_history_obesity"><option value="0">No</option><option value="1">Yes</option></select></label>
+            <label>Do you smoke? (your own smoking, not people around you) <select name="smoke"><option value="0">No</option><option value="1">Yes</option></select></label>
+            <label>Calorie monitoring <select name="calorie_monitoring"><option value="0">No</option><option value="1">Yes</option></select></label>
+            <label>Alcohol frequency
+              <select name="alcohol_frequency">
+                <option value="0">No</option>
+                <option value="1">Sometimes</option>
+                <option value="2">Frequently</option>
+                <option value="3">Always</option>
+              </select>
+            </label>
           </div>
           <div class="step-actions"><button class="step-back" type="button" data-back>Previous</button><button type="button" data-next>Review answers</button></div>
         </section>
 
-        <section class="form-step" data-step="4">
+        <section class="form-step" data-step="5">
           <h2>Ready for your estimate.</h2>
           <p>Review your answers, then let O-Beast find the strongest current pattern.</p>
           <div class="review-grid" id="reviewGrid" aria-live="polite"></div>
@@ -3678,7 +1048,7 @@ def predictor() -> str:
       var name=document.getElementById('stepName');
       var review=document.getElementById('reviewGrid');
       var current=0;
-      var names=['Body profile','Daily routine','Food and family','Review'];
+      var names=['Body profile','Daily routine','Food pattern','Health context','Review'];
 
       function show(index,shouldScroll){{
         current=Math.max(0,Math.min(index,steps.length-1));
@@ -3698,12 +1068,15 @@ def predictor() -> str:
       }}
 
       function buildReview(){{
-        var labels={{
-          age:'Age',sex:'Sex',height_cm:'Height',weight_kg:'Weight',
-          physical_activity_hours_per_week:'Weekly activity',screen_time_hours_per_day:'Daily screen time',
-          sleep_hours:'Daily sleep',fast_food_meals_per_week:'Weekly fast food',
-          sugary_drinks_per_day:'Daily sugary drinks',family_history_obesity:'Family history'
-        }};
+          var labels={{
+            age:'Age',sex:'Sex',height_cm:'Height',weight_kg:'Weight',
+            physical_activity_freq:'Activity (days/week)',screen_time_band:'Device time',
+            water_daily:'Daily water',transportation:'Transportation',
+            high_calorie_food_frequency:'High-calorie food',vegetable_frequency:'Vegetables',
+            main_meals_per_day:'Main meals',food_between_meals_frequency:'Between-meal food',
+            family_history_obesity:'Family history',smoke:'Smoke (self)',
+            calorie_monitoring:'Calorie monitoring',alcohol_frequency:'Alcohol frequency'
+          }};
         review.innerHTML='';
         Object.keys(labels).forEach(function(key){{
           var input=form.elements[key];
@@ -3728,42 +1101,43 @@ def predictor() -> str:
     return page_shell("Predictor - SK Obesity ML", body)
 
 
-@app.post("/predict")
-def predict_api(payload: ObesityInput) -> dict:
-    return predict_probability(payload.model_dump())
-
-
-@app.post("/chat")
-def chat_endpoint(payload: ChatRequest) -> dict:
-    from obesity_ml.chatbot import chat
-    return chat(payload.message, payload.lang, payload.context)
-
-
 @app.post("/advice", response_class=HTMLResponse)
 def advice_from_form(
     age: int = Form(...),
     sex: str = Form(...),
     height_cm: float = Form(...),
     weight_kg: float = Form(...),
-    physical_activity_hours_per_week: float = Form(...),
-    screen_time_hours_per_day: float = Form(...),
-    sleep_hours: float = Form(...),
-    fast_food_meals_per_week: int = Form(...),
-    sugary_drinks_per_day: float = Form(...),
     family_history_obesity: int = Form(...),
+    high_calorie_food_frequency: int = Form(...),
+    vegetable_frequency: float = Form(...),
+    main_meals_per_day: float = Form(...),
+    food_between_meals_frequency: int = Form(...),
+    smoke: int = Form(...),
+    water_daily: float = Form(...),
+    calorie_monitoring: int = Form(...),
+    physical_activity_freq: float = Form(...),
+    screen_time_band: int = Form(...),
+    alcohol_frequency: int = Form(...),
+    transportation: str = Form(...),
 ) -> str:
-    input_data = {
-        "age": age,
-        "sex": sex,
-        "height_cm": height_cm,
-        "weight_kg": weight_kg,
-        "physical_activity_hours_per_week": physical_activity_hours_per_week,
-        "screen_time_hours_per_day": screen_time_hours_per_day,
-        "sleep_hours": sleep_hours,
-        "fast_food_meals_per_week": fast_food_meals_per_week,
-        "sugary_drinks_per_day": sugary_drinks_per_day,
-        "family_history_obesity": family_history_obesity,
-    }
+    input_data = build_prediction_input(
+        age=age,
+        sex=sex,
+        height_cm=height_cm,
+        weight_kg=weight_kg,
+        family_history_obesity=family_history_obesity,
+        high_calorie_food_frequency=high_calorie_food_frequency,
+        vegetable_frequency=vegetable_frequency,
+        main_meals_per_day=main_meals_per_day,
+        food_between_meals_frequency=food_between_meals_frequency,
+        smoke=smoke,
+        water_daily=water_daily,
+        calorie_monitoring=calorie_monitoring,
+        alcohol_frequency=alcohol_frequency,
+        transportation=transportation,
+        physical_activity_freq=physical_activity_freq,
+        screen_time_band=screen_time_band,
+    )
     try:
         validate_form_input(input_data)
         result = predict_probability(input_data)
@@ -3801,25 +1175,37 @@ def predict_form(
     sex: str = Form(...),
     height_cm: float = Form(...),
     weight_kg: float = Form(...),
-    physical_activity_hours_per_week: float = Form(...),
-    screen_time_hours_per_day: float = Form(...),
-    sleep_hours: float = Form(...),
-    fast_food_meals_per_week: int = Form(...),
-    sugary_drinks_per_day: float = Form(...),
     family_history_obesity: int = Form(...),
+    high_calorie_food_frequency: int = Form(...),
+    vegetable_frequency: float = Form(...),
+    main_meals_per_day: float = Form(...),
+    food_between_meals_frequency: int = Form(...),
+    smoke: int = Form(...),
+    water_daily: float = Form(...),
+    calorie_monitoring: int = Form(...),
+    physical_activity_freq: float = Form(...),
+    screen_time_band: int = Form(...),
+    alcohol_frequency: int = Form(...),
+    transportation: str = Form(...),
 ) -> str:
-    input_data = {
-        "age": age,
-        "sex": sex,
-        "height_cm": height_cm,
-        "weight_kg": weight_kg,
-        "physical_activity_hours_per_week": physical_activity_hours_per_week,
-        "screen_time_hours_per_day": screen_time_hours_per_day,
-        "sleep_hours": sleep_hours,
-        "fast_food_meals_per_week": fast_food_meals_per_week,
-        "sugary_drinks_per_day": sugary_drinks_per_day,
-        "family_history_obesity": family_history_obesity,
-    }
+    input_data = build_prediction_input(
+        age=age,
+        sex=sex,
+        height_cm=height_cm,
+        weight_kg=weight_kg,
+        family_history_obesity=family_history_obesity,
+        high_calorie_food_frequency=high_calorie_food_frequency,
+        vegetable_frequency=vegetable_frequency,
+        main_meals_per_day=main_meals_per_day,
+        food_between_meals_frequency=food_between_meals_frequency,
+        smoke=smoke,
+        water_daily=water_daily,
+        calorie_monitoring=calorie_monitoring,
+        alcohol_frequency=alcohol_frequency,
+        transportation=transportation,
+        physical_activity_freq=physical_activity_freq,
+        screen_time_band=screen_time_band,
+    )
     try:
         validate_form_input(input_data)
         result = predict_probability(input_data)
@@ -3922,3 +1308,7 @@ def predict_form(
             "notify": True,
         },
     )
+
+
+from obesity_ml.routes import api as _api_routes  # noqa: E402  (routes import app-level helpers)
+app.include_router(_api_routes.router)

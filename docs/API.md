@@ -25,20 +25,28 @@ http://127.0.0.1:8000
 
 Returns probability estimate and model metadata.
 
+The API uses the full UCI ObesityDataSet question set. All sixteen fields are required.
+
 Request:
 
 ```json
 {
-  "age": 16,
-  "sex": "M",
-  "height_cm": 170,
-  "weight_kg": 65,
-  "physical_activity_hours_per_week": 3,
-  "screen_time_hours_per_day": 5,
-  "sleep_hours": 7,
-  "fast_food_meals_per_week": 2,
-  "sugary_drinks_per_day": 1,
-  "family_history_obesity": 0
+  "age": 21,
+  "sex": "F",
+  "height_cm": 162,
+  "weight_kg": 64,
+  "family_history_obesity": 1,
+  "high_calorie_food_frequency": 0,
+  "vegetable_frequency": 2,
+  "main_meals_per_day": 3,
+  "food_between_meals_frequency": 1,
+  "smoke": 0,
+  "water_daily": 2,
+  "calorie_monitoring": 0,
+  "physical_activity_freq": 2,
+  "screen_time_band": 1,
+  "alcohol_frequency": 0,
+  "transportation": "Public_Transportation"
 }
 ```
 
@@ -69,16 +77,22 @@ Response shape (example values are the real output for the sample request above,
 
 Validation:
 
-- `age`: 5-100
+- `age`: 14-100
 - `sex`: `M` or `F`
 - `height_cm`: 80-230
 - `weight_kg`: 20-250
-- `physical_activity_hours_per_week`: 0-40
-- `screen_time_hours_per_day`: 0-24
-- `sleep_hours`: 0-16
-- `fast_food_meals_per_week`: 0-30
-- `sugary_drinks_per_day`: 0-20
 - `family_history_obesity`: 0 or 1
+- `high_calorie_food_frequency` (FAVC): 0 or 1
+- `vegetable_frequency` (FCVC): 1-3
+- `main_meals_per_day` (NCP): 1-4
+- `food_between_meals_frequency` (CAEC): 0-3
+- `smoke` (SMOKE): 0 or 1 (user's own smoking, not second-hand)
+- `water_daily` (CH2O): 1-3
+- `calorie_monitoring` (SCC): 0 or 1
+- `physical_activity_freq` (FAF): 0-3
+- `screen_time_band` (TUE): 0-2
+- `alcohol_frequency` (CALC): integer 0-3 (No/Sometimes/Frequently/Always)
+- `transportation` (MTRANS): `Automobile`, `Bike`, `Motorbike`, `Public_Transportation`, or `Walking`
 
 ### `POST /chat`
 
@@ -117,6 +131,9 @@ Response shape:
 ## Related Files
 
 - `src/obesity_ml/app.py`
+- `src/obesity_ml/routes/api.py`
+- `src/obesity_ml/templates/base.html`
+- `src/obesity_ml/templates/partials/styles.html`
 - `src/obesity_ml/predict.py`
 - `src/obesity_ml/advice.py`
 - `src/obesity_ml/chatbot.py`

@@ -1,17 +1,38 @@
 import pandas as pd
 
-from obesity_ml.config import OPTIONAL_INPUT_DEFAULTS, REQUIRED_INPUT_COLUMNS, TARGET_COLUMN
+from obesity_ml.config import (
+    CATEGORICAL_OPTIONAL_DEFAULTS,
+    OPTIONAL_INPUT_DEFAULTS,
+    REQUIRED_INPUT_COLUMNS,
+    TARGET_COLUMN,
+)
 
 
+# Valid ranges for the pure UCI ObesityDataSet feature schema. Height/weight stay
+# for the BMI screen; the rest are the lifestyle inputs the model trains on.
 NUMERIC_PREDICTION_RANGES = {
-    "age": (5, 100),
+    "age": (14, 100),
     "height_cm": (80, 230),
     "weight_kg": (20, 250),
-    "physical_activity_hours_per_week": (0, 40),
-    "screen_time_hours_per_day": (0, 24),
-    "sleep_hours": (0, 16),
-    "fast_food_meals_per_week": (0, 30),
-    "sugary_drinks_per_day": (0, 20),
+    "physical_activity_freq": (0, 3),       # FAF
+    "screen_time_band": (0, 2),             # TUE
+    "high_calorie_food_frequency": (0, 1),  # FAVC
+    "vegetable_frequency": (1, 3),          # FCVC
+    "main_meals_per_day": (1, 4),           # NCP
+    "food_between_meals_frequency": (0, 3), # CAEC
+    "smoke": (0, 1),                        # SMOKE
+    "water_daily": (1, 3),                  # CH2O
+    "calorie_monitoring": (0, 1),           # SCC
+    "alcohol_frequency": (0, 3),            # CALC
+}
+
+# Allowed MTRANS categories from the UCI ObesityDataSet.
+TRANSPORTATION_VALUES = {
+    "Automobile",
+    "Bike",
+    "Motorbike",
+    "Public_Transportation",
+    "Walking",
 }
 
 
@@ -32,6 +53,8 @@ def validate_prediction_frame(df: pd.DataFrame) -> None:
 
     invalid = []
     for column, (minimum, maximum) in NUMERIC_PREDICTION_RANGES.items():
+        if column not in df.columns:
+            continue
         values = pd.to_numeric(df[column], errors="coerce")
         if values.isna().any() or (~values.between(minimum, maximum)).any():
             invalid.append(f"{column} must be between {minimum} and {maximum}")
@@ -43,6 +66,11 @@ def validate_prediction_frame(df: pd.DataFrame) -> None:
     family_values = pd.to_numeric(df["family_history_obesity"], errors="coerce")
     if family_values.isna().any() or (~family_values.isin({0, 1})).any():
         invalid.append("family_history_obesity must be 0 or 1")
+
+    if "transportation" in df.columns:
+        transport_values = df["transportation"].astype(str).str.strip()
+        if (~transport_values.isin(TRANSPORTATION_VALUES)).any():
+            invalid.append("transportation must match a UCI transportation category")
 
     if invalid:
         raise ValueError("Prediction input has invalid values: " + "; ".join(invalid))
@@ -57,6 +85,10 @@ def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
         if column not in out.columns:
             out[column] = default
         out[column] = pd.to_numeric(out[column], errors="coerce").fillna(default)
+    for column, default in CATEGORICAL_OPTIONAL_DEFAULTS.items():
+        if column not in out.columns:
+            out[column] = default
+        out[column] = out[column].astype(str).str.strip().replace({"": default, "nan": default}).fillna(default)
     out["family_history_obesity"] = out["family_history_obesity"].astype(str)
     out["sex"] = out["sex"].astype(str).str.upper().str.strip()
     return out

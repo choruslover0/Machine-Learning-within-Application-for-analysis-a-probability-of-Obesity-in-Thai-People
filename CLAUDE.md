@@ -17,19 +17,20 @@ Follow [AGENTS.md](./AGENTS.md). This file exists for Claude-style tools that lo
 - Lifestyle ML must exclude `height_cm`, `weight_kg`, and `bmi`.
 - Final probability is the 50/50 blend of lifestyle ML and BMI screening.
 - SMOTENC is balancing, not an algorithm.
-- Current dataset is still prototype-grade until doctor-diagnosis labels arrive.
+- Sole training source is the open-source UCI ObesityDataSet (Colombia/Peru/Mexico); the form collects the full UCI question set.
+- Always disclaim that data is verified open-source, not Thai-population data, until final Thai study data and doctor-diagnosis labels arrive.
 
 ## Common Commands
 
 ```bash
-PYTHONPATH=src python3 -m obesity_ml.form_import \
-  --input data/raw/google_form_1_current.csv data/raw/google_form_2_current.csv \
-  --output data/processed/current_google_forms_training.csv
+PYTHONPATH=src python3 -m obesity_ml.uci_import \
+  --input data/raw/uci_obesity_2019.csv \
+  --output data/processed/uci_obesity_training.csv
 ```
 
 ```bash
 PYTHONPATH=src python3 -m obesity_ml.train \
-  --data data/processed/current_google_forms_training.csv \
+  --data data/processed/uci_obesity_training.csv \
   --model models/obesity_probability_model.joblib
 ```
 
