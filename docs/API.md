@@ -86,12 +86,12 @@ Validation:
 - `vegetable_frequency` (FCVC): 1-3
 - `main_meals_per_day` (NCP): 1-4
 - `food_between_meals_frequency` (CAEC): 0-3
-- `smoke` (SMOKE): 0 or 1
+- `smoke` (SMOKE): 0 or 1 (user's own smoking, not second-hand)
 - `water_daily` (CH2O): 1-3
 - `calorie_monitoring` (SCC): 0 or 1
 - `physical_activity_freq` (FAF): 0-3
 - `screen_time_band` (TUE): 0-2
-- `alcohol_frequency` (CALC): 0-3
+- `alcohol_frequency` (CALC): integer 0-3 (No/Sometimes/Frequently/Always)
 - `transportation` (MTRANS): `Automobile`, `Bike`, `Motorbike`, `Public_Transportation`, or `Walking`
 
 ### `POST /chat`

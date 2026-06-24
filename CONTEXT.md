@@ -71,3 +71,11 @@ _Avoid_: Self-report only, BMI target
 **Open-Source Training Disclaimer**:
 The statement that O-Beast is trained on verified open-source data, not Thai-population data, and gives an educational estimate that combines lifestyle habits and a BMI screen.
 _Avoid_: Thai-validated, clinically validated, diagnosis
+
+**Self-Reported Smoking**:
+The smoking question asks only about the user's own smoking, not second-hand or household smoking. Stored as the binary `smoke` feature.
+_Avoid_: Second-hand smoke, household smoking, environmental exposure
+
+**Ordinal Lifestyle Codes**:
+Frequency-style lifestyle answers (alcohol/CALC, food-between-meals/CAEC, vegetables/FCVC, water/CH2O, activity/FAF, device-time/TUE) are integer ordinal codes, not free decimals. The form collects them as fixed choices.
+_Avoid_: Continuous score, free decimal input
