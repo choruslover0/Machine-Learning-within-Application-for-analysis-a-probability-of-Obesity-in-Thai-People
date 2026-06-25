@@ -1,0 +1,16 @@
+# Render Blueprint for the O-Beast app (FastAPI + scikit-learn / XGBoost).
+# Deploy: Render dashboard -> New + -> Blueprint -> connect this repo -> Apply.
+services:
+  - type: web
+    name: o-beast
+    runtime: python
+    plan: free
+    region: singapore            # closest free region to Thailand
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn obesity_ml.app:app --app-dir src --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    autoDeploy: true             # redeploy on every push to main
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"          # stable wheels for scikit-learn 1.6 / xgboost 3.1
