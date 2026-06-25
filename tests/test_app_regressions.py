@@ -526,7 +526,7 @@ class RouteRegressionTests(unittest.TestCase):
 
         self.assertEqual(home_response.status_code, 200)
         self.assertIn("Know your risk", home_response.text)
-        self.assertIn("premium-health-pattern.png", home_response.text)
+        self.assertIn("premium-health-pattern.jpg", home_response.text)
         self.assertIn("prefers-reduced-motion", home_response.text)
 
         self.assertEqual(predictor_response.status_code, 200)

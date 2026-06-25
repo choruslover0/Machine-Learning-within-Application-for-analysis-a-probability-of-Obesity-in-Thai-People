@@ -743,7 +743,7 @@ def home() -> str:
         </div>
       </div>
       <div class="premium-health-visual">
-        <img src="/static/premium-health-pattern.png" alt="Lifestyle signals flowing into an organized wellness pattern">
+        <img src="/static/premium-health-pattern.jpg" alt="Lifestyle signals flowing into an organized wellness pattern">
         <div class="visual-caption">
           <strong>Daily signals become a clearer pattern</strong>
           <span>Body profile, movement, food, sleep, and family history work together.</span>
